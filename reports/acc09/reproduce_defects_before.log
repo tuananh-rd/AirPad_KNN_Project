@@ -1,0 +1,36 @@
+﻿======================================================================
+ACC-09 DEFECT REPRODUCTION ON SAVED ORIGINAL CODE (BEFORE EDITS)
+======================================================================
+
+[TEST A] Reproducing Defect A: Stop in rate_limiter.allow emits MOVE afterward...
+  -> pipe_a.is_emergency_stopped = True
+  -> fsm_a.state = PAUSED
+  -> action_fired = MOVE
+  -> MOVE events emitted after stop = 1
+  [CONFIRMED] Defect A reproduced on before-code: MOVE event leaked after emergency stop.
+
+[TEST B] Reproducing Defect B: Stop during drag start leaves held left button...
+  -> pipe_b.is_emergency_stopped = True
+  -> fsm_b.state = PAUSED
+  -> fsm_b.is_mouse_down = True
+  -> ctrl_b.held_buttons = {'left'}
+  [CONFIRMED] Defect B reproduced on before-code: left button remains held after emergency stop.
+
+[TEST C] Reproducing Defect C: Failing mouseUp discarded anyway; modifier keys untracked...
+  -> ctrl_c._held_buttons after failed cleanup = set()
+  [CONFIRMED] Defect C1 reproduced on before-code: Failed mouseUp discarded; retry missed.
+  -> During zoom scroll, ctrl in _held_keys = False
+  [CONFIRMED] Defect C2 reproduced on before-code: Zoom Ctrl key bypassed _held_keys tracking.
+
+[TEST D] Reproducing Defect D: Failed hotkey registration admits real-control pipeline...
+Warning: 'keyboard' module not installed, hotkey disabled.
+Failed to register hotkey: Hook conflict / privilege error
+Failed to register hotkey: Hook conflict / privilege error
+  -> pipe_d created with WindowsController: WindowsController
+  -> hotkey registered: False
+  -> pipeline emergency_stopped: False
+  [CONFIRMED] Defect D reproduced on before-code: Real-control pipeline admitted without working emergency hotkey!
+
+======================================================================
+ALL 4 PRE-FIX DEFECTS POSITIVELY REPRODUCED ON SAVED ORIGINAL CODE
+======================================================================

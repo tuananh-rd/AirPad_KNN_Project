@@ -1,0 +1,136 @@
+{
+  "benchmark_type": "dynamic_synthetic_intent_benchmark_v2",
+  "generated_at": "2026-10-02T03:53:55Z",
+  "pinned_baselines": {
+    "original_scroll_engine": {
+      "path": "reports/hyb01/before/src/motion/scroll.py",
+      "sha256": "EEE878AD3DD049E975EC2C1475854C1BFDE31873E14F7C175A22B6351DD9C5EC"
+    }
+  },
+  "slow_continuous_scroll": {
+    "frames": 100,
+    "per_frame_dy": 0.002,
+    "total_motion_delta": 0.2,
+    "saved_original_engine": {
+      "path": "reports/hyb01/before/src/motion/scroll.py",
+      "sha256": "EEE878AD3DD049E975EC2C1475854C1BFDE31873E14F7C175A22B6351DD9C5EC",
+      "scroll_units_emitted": 0,
+      "deadzone_dropping_confirmed": true
+    },
+    "hybrid_standalone_engine": {
+      "scroll_units_emitted": 23,
+      "accumulation_success": true
+    },
+    "hybrid_pipeline": {
+      "scroll_units_emitted": 23,
+      "actions_fired": {
+        "SCROLL": 23
+      },
+      "forbidden_counts": {
+        "forbidden_moves": 0,
+        "forbidden_clicks": 0,
+        "forbidden_drags": 0,
+        "forbidden_zooms": 0,
+        "forbidden_history": 0
+      },
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "disclosure": "Idealized Majority(1)/Stability(1) filter configuration used to isolate mathematical accumulator behavior on exact motion vectors. Does not represent production filters (Majority 5, Stability 2) or human hand tremor."
+  },
+  "stationary_jitter_suppression": {
+    "frames": 100,
+    "jitter_amplitude": 0.0015,
+    "total_events": 0,
+    "absolute_scroll_units": 0,
+    "net_scroll_units": 0,
+    "jitter_suppressed": true,
+    "actions_fired": {},
+    "forbidden_counts": {
+      "forbidden_moves": 0,
+      "forbidden_clicks": 0,
+      "forbidden_drags": 0,
+      "forbidden_zooms": 0,
+      "forbidden_history": 0
+    },
+    "held_buttons_clean": true,
+    "held_keys_clean": true
+  },
+  "tab_switching_neutral_rearm_contract": {
+    "timeline_ms": [
+      0.0,
+      150.0,
+      250.0,
+      600.0,
+      650.0,
+      700.0,
+      850.0
+    ],
+    "actions_fired": {
+      "TAB_PREV": 1,
+      "TAB_NEXT": 1
+    },
+    "tab_key_events": 2,
+    "cooldown_crossed_while_still_three_rearm_suppressed": false,
+    "forbidden_counts": {
+      "forbidden_moves": 0,
+      "forbidden_clicks": 0,
+      "forbidden_drags": 0,
+      "forbidden_zooms": 0,
+      "forbidden_history": 0
+    },
+    "held_buttons_clean": true,
+    "held_keys_clean": true
+  },
+  "assist_off_transition": {
+    "initial_state": "READY",
+    "transition_to": "OFF",
+    "temporal_filters": "Majority(5, 0.6) + Stability(2)",
+    "total_frames_in_off": 45,
+    "total_events": 0,
+    "actions_fired": {},
+    "forbidden_counts": {
+      "forbidden_moves": 0,
+      "forbidden_clicks": 0,
+      "forbidden_drags": 0,
+      "forbidden_zooms": 0,
+      "forbidden_history": 0
+    },
+    "held_buttons_clean": true,
+    "held_keys_clean": true
+  },
+  "safety_audit": {
+    "all_held_buttons_clean": true,
+    "all_held_keys_clean": true,
+    "all_forbidden_counts": {
+      "slow_scroll": {
+        "forbidden_moves": 0,
+        "forbidden_clicks": 0,
+        "forbidden_drags": 0,
+        "forbidden_zooms": 0,
+        "forbidden_history": 0
+      },
+      "jitter": {
+        "forbidden_moves": 0,
+        "forbidden_clicks": 0,
+        "forbidden_drags": 0,
+        "forbidden_zooms": 0,
+        "forbidden_history": 0
+      },
+      "tab": {
+        "forbidden_moves": 0,
+        "forbidden_clicks": 0,
+        "forbidden_drags": 0,
+        "forbidden_zooms": 0,
+        "forbidden_history": 0
+      },
+      "off_transition": {
+        "forbidden_moves": 0,
+        "forbidden_clicks": 0,
+        "forbidden_drags": 0,
+        "forbidden_zooms": 0,
+        "forbidden_history": 0
+      }
+    }
+  }
+}

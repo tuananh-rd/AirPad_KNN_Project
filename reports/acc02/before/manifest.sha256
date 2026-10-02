@@ -1,0 +1,5 @@
+498699e1f28a78031193476fbafff2a2cd307bb9d82a8baee6a57f3097019169  custom (data/custom_airpad.npz)
+ec38045d608aa6d30386796e4e0586ff619468d4abfd755619835bb8fa61c081  hagrid (data/hagrid_airpad.npz)
+c0c6d4e26c26f8a303077c6de971a54c2d4085444f9479cef9e021986cc9e8bf  combined (data/combined_airpad.npz)
+4cc3c55f5e4b571c5462de31afd6d5c4db64c803466d306cdefab34b31d7b977  model (models/airpad_svm.json)
+9c90d5acf46768e25d9054463478945cd1381d5a0b1b525f1e72082277f7bd6f  pre_edit (tools/collect_data.py)

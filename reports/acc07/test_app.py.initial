@@ -1,0 +1,75 @@
+"""Tests for app.py CLI commands and safety checks.
+
+Covers:
+- `--self-check` execution without webcam returning exit code 0.
+- `--replay fixtures/synthetic_replay.json` execution in dry-run mode.
+- `--real-control` printing safety warning banner.
+- `--camera` graceful failure when dependencies are mocked as missing.
+- Default `main()` with no arguments returning 0 and displaying help.
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import pytest
+from unittest.mock import patch
+
+from app import main, run_self_check, run_replay, run_camera, WARNING_BANNER
+
+
+def test_self_check_succeeds():
+    """--self-check must execute end-to-end without webcam and return 0."""
+    exit_code = run_self_check()
+    assert exit_code == 0
+
+
+def test_main_cli_self_check():
+    exit_code = main(["--self-check"])
+    assert exit_code == 0
+
+
+def test_main_cli_replay(tmp_path):
+    fixture_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "fixtures", "synthetic_replay.json"
+    )
+    assert os.path.exists(fixture_path)
+    exit_code = main(["--replay", fixture_path])
+    assert exit_code == 0
+
+
+def test_main_cli_no_args_prints_help(capsys):
+    exit_code = main([])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "usage:" in captured.out.lower() or "options:" in captured.out.lower()
+
+
+def test_real_control_prints_warning(capsys):
+    fixture_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "fixtures", "synthetic_replay.json"
+    )
+    # Replay with --real-control: should print warning banner
+    # We mock WindowsController to avoid actually moving user's OS mouse
+    with patch("src.platform.windows.WindowsController") as mock_ctrl_class:
+        mock_instance = mock_ctrl_class.return_value
+        mock_instance.held_buttons = set()
+        exit_code = main(["--replay", fixture_path, "--real-control"])
+        assert exit_code == 0
+
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.out
+    assert "REAL OS CONTROL" in captured.out
+
+
+def test_camera_missing_dependencies(capsys):
+    # Hide cv2 to test graceful degradation
+    with patch.dict("sys.modules", {"cv2": None}):
+        exit_code = run_camera()
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "opencv-python" in captured.out
+
+
+def test_replay_nonexistent_fixture():
+    exit_code = run_replay("nonexistent_fixture_file.json")
+    assert exit_code == 1

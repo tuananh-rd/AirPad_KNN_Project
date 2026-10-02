@@ -1,0 +1,12 @@
+--- a/tools/collect_data.py
++++ b/tools/collect_data.py
+@@ -471,7 +471,8 @@
+ 
+             frame = cv2.flip(frame, 1)
+             h, w, _ = frame.shape
+-            hands = detector.detect(frame)
++            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
++            hands = detector.detect(rgb_frame)
+ 
+             detected_hand = hands[0] if hands else None
+             record_this_frame = False

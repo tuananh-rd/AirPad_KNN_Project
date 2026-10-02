@@ -1,0 +1,187 @@
+--- a/src/gesture/fsm.py
++++ b/src/gesture/fsm.py
+@@ -42,6 +42,7 @@
+         self._last_pose = HandPose.UNKNOWN
+         self._last_action_ms: float = 0.0
+         self._is_mouse_down: bool = False
++        self._emergency_stopped: bool = False
+ 
+         # Configuration parameters
+         self.drag_threshold_ms = float(config.get('drag_threshold_ms', 400.0))
+@@ -68,6 +69,8 @@
+ 
+         self._reacquire_count: int = 0
+         self._unknown_count: int = 0
++        self.gate: Optional[Any] = None
++        self._before_mouse_down_bookkeeping_hook: Optional[Callable[[], None]] = None
+ 
+     @property
+     def is_mouse_down(self) -> bool:
+@@ -76,6 +79,15 @@
+     @property
+     def is_reacquired(self) -> bool:
+         return self._reacquire_count >= self.reacquire_stable_frames and self._unknown_count == 0
++
++    @property
++    def is_stopped(self) -> bool:
++        if self._emergency_stopped:
++            return True
++        gate = getattr(self, 'gate', None) or getattr(getattr(self, 'controller', None), 'gate', None)
++        if gate and getattr(gate, 'is_stopped', False):
++            return True
++        return False
+ 
+     def can_move_cursor(self, pose: HandPose) -> bool:
+         """Check if cursor motion is currently valid and safe.
+@@ -85,7 +97,11 @@
+         - In MOVING state with POINT_ONE pose and stable reacquisition.
+         - In DRAGGING state with PINCH_CLOSED pose and confirmed button down.
+         - Not in UNKNOWN or degraded tracking state.
++        - Not in emergency stop.
+         """
++        if self.is_stopped:
++            return False
++
+         if not isinstance(pose, HandPose):
+             return False
+ 
+@@ -103,6 +119,8 @@
+ 
+     def is_scrolling_active(self, pose: HandPose) -> bool:
+         """Check if scrolling output is active. UNKNOWN/OTHER immediately halts output."""
++        if self.is_stopped:
++            return False
+         if not isinstance(pose, HandPose):
+             return False
+         if pose in (HandPose.UNKNOWN, HandPose.OTHER):
+@@ -111,6 +129,8 @@
+ 
+     def is_zoom_active(self, pose: HandPose) -> bool:
+         """Check if zoom output is active. UNKNOWN/OTHER immediately halts output."""
++        if self.is_stopped:
++            return False
+         if not isinstance(pose, HandPose):
+             return False
+         if pose in (HandPose.UNKNOWN, HandPose.OTHER):
+@@ -139,6 +159,25 @@
+         This method is the ONLY entry point for state transitions.
+         All side effects (mouse/key events) happen here.
+         """
++        if self.is_stopped:
++            self.state = FSMState.PAUSED
++            return self.state
++
++        if self.gate is not None and hasattr(self.gate, "transaction"):
++            with self.gate.transaction() as active:
++                if not active or self.is_stopped:
++                    self.state = FSMState.PAUSED
++                    return self.state
++                return self._update_impl(pose, timestamp_ms, landmarks)
++        else:
++            return self._update_impl(pose, timestamp_ms, landmarks)
++
++    def _update_impl(
++        self,
++        pose: HandPose,
++        timestamp_ms: float,
++        landmarks: Optional[np.ndarray] = None,
++    ) -> FSMState:
+         timestamp_ms = float(timestamp_ms)
+ 
+         # Global override: NO_HAND or OPEN_PALM always resets pending and triggers cleanup,
+@@ -222,20 +261,28 @@
+ 
+             if pose == HandPose.PINCH_CLOSED:
+                 if elapsed >= self.drag_threshold_ms:
+-                    self.state = FSMState.DRAGGING
+-                    self.controller.mouse_down('left')
+-                    self._is_mouse_down = True
++                    success = False
++                    try:
++                        self.controller.mouse_down('left')
++                        success = True
++                    finally:
++                        if success and not self.is_stopped:
++                            self.state = FSMState.DRAGGING
++                            self._is_mouse_down = True
++                        else:
++                            self.state = FSMState.PAUSED
++                            self._is_mouse_down = False
+             elif pose == HandPose.POINT_ONE:
+                 # Only clean release to POINT_ONE can fire left click
+                 if self.click_min_ms <= elapsed <= self.click_max_ms:
+                     if timestamp_ms - self._last_action_ms >= self.debounce_ms:
+                         self.controller.mouse_click('left')
+                         self._last_action_ms = timestamp_ms
+-                self.state = FSMState.MOVING
++                self.state = FSMState.PAUSED if self.is_stopped else FSMState.MOVING
+                 self._pinch_start_ms = None
+             else:
+                 # Any other pose (PINCH_MIDDLE, UNKNOWN, OTHER, FIST) cancels click
+-                self.state = FSMState.MOVING
++                self.state = FSMState.PAUSED if self.is_stopped else FSMState.MOVING
+                 self._pinch_start_ms = None
+                 self._reacquire_count = 0
+ 
+@@ -253,11 +300,11 @@
+                     if timestamp_ms - self._last_action_ms >= self.debounce_ms:
+                         self.controller.mouse_click('right')
+                         self._last_action_ms = timestamp_ms
+-                self.state = FSMState.MOVING
++                self.state = FSMState.PAUSED if self.is_stopped else FSMState.MOVING
+                 self._right_pinch_start_ms = None
+             else:
+                 # Any other pose (PINCH_CLOSED, UNKNOWN, OTHER, FIST) cancels right click
+-                self.state = FSMState.MOVING
++                self.state = FSMState.PAUSED if self.is_stopped else FSMState.MOVING
+                 self._right_pinch_start_ms = None
+                 self._reacquire_count = 0
+ 
+@@ -318,6 +365,9 @@
+                 self._hysteresis_count = 0
+                 self._unknown_count = 0
+ 
++        if self.is_stopped:
++            self.state = FSMState.PAUSED
++
+         self._last_pose = pose
+         return self.state
+ 
+@@ -333,13 +383,12 @@
+ 
+     def on_emergency_stop(self) -> None:
+         """Emergency stop hotkey pressed."""
++        self._emergency_stopped = True
++        self.state = FSMState.PAUSED
+         self._force_cleanup()
+-        self.state = FSMState.PAUSED
+ 
+     def _force_cleanup(self) -> None:
+         """Release all held buttons/keys via controller.cleanup() and reset state."""
+-        self._exit_dragging()
+-        self.controller.cleanup()
+         self.state = FSMState.PAUSED
+         self._pinch_start_ms = None
+         self._right_pinch_start_ms = None
+@@ -349,3 +398,21 @@
+         self._reacquire_count = 0
+         self._unknown_count = 0
+         self._last_pose = HandPose.UNKNOWN
++
++        cleanup_exc: Optional[Exception] = None
++        try:
++            self._exit_dragging()
++        except Exception as e:
++            cleanup_exc = e
++
++        try:
++            self.controller.cleanup()
++        except Exception as e:
++            if cleanup_exc is None:
++                cleanup_exc = e
++
++        if cleanup_exc is not None:
++            raise cleanup_exc
++
++        # Mouse down flag is only cleared once release is confirmed successful
++        self._is_mouse_down = False

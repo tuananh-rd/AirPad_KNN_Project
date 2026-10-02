@@ -1,0 +1,251 @@
+"""
+Safety and failsafe mechanisms.
+"""
+from __future__ import annotations
+
+import contextlib
+import logging
+import time
+import threading
+from typing import Any, Callable, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class RateLimiter:
+    """Rate limiter to ensure we don't spam OS events."""
+    
+    def __init__(self, max_events_per_second: int):
+        self.max_events_per_second = max_events_per_second
+        self.interval = 1.0 / max_events_per_second
+        self.last_event_time = 0.0
+        self._lock = threading.Lock()
+        
+    def allow(self) -> bool:
+        """Check if an event is allowed based on rate limits."""
+        with self._lock:
+            now = time.time()
+            if now - self.last_event_time >= self.interval:
+                self.last_event_time = now
+                return True
+            return False
+
+
+class FailsafeMonitor:
+    """Monitors for failsafe conditions like cursor in corner."""
+    
+    def __init__(self, screen_width: int, screen_height: int, corner_size: int = 10):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.corner_size = corner_size
+        self._is_stopped = False
+        
+    def check_position(self, x: int, y: int) -> bool:
+        """
+        Check if position is in a failsafe corner (top-left or top-right etc).
+        Returns True if failsafe triggered, False otherwise.
+        """
+        if self._is_stopped:
+            return True
+            
+        if (
+            (x <= self.corner_size and y <= self.corner_size)
+            or (x >= self.screen_width - self.corner_size and y <= self.corner_size)
+            or (x <= self.corner_size and y >= self.screen_height - self.corner_size)
+            or (x >= self.screen_width - self.corner_size and y >= self.screen_height - self.corner_size)
+        ):
+            self.emergency_stop()
+            return True
+            
+        return False
+        
+    def emergency_stop(self) -> None:
+        """Trigger emergency stop."""
+        self._is_stopped = True
+        
+    def is_stopped(self) -> bool:
+        """Check if emergency stop was triggered."""
+        return self._is_stopped
+
+
+class SafetyGate:
+    """Thread-safe synchronization and dispatch gate for emergency stop and OS actions.
+
+    Linearizes emergency stop requests with in-flight OS actions and held-input bookkeeping.
+    Guarantees:
+    - Stop request latches immediately and permanently (`is_stopped == True`).
+    - Forward actions (move, click, down, scroll, zoom, swipe, key_down) are refused once stopped.
+    - Release actions (mouse_up, key_up, cleanup) remain permitted while stopped.
+    - In same-thread reentrant stops (e.g. stop triggered inside an OS stub during dispatch),
+      cleanup execution is deferred until the outermost active dispatch and its caller
+      bookkeeping completes. This prevents ['started', 'release', 'finishes_down'] anomalies.
+    - In cross-thread stops (e.g. hotkey thread), the stop request latches immediately while
+      cleanup acquisition waits for in-flight dispatch lock release, avoiding race conditions
+      and deadlocks.
+    - Cleanup exceptions are preserved conservatively.
+    """
+
+    def __init__(self):
+        self._stopped = False
+        self._lock = threading.RLock()
+        self._dispatch_depth = 0
+        self._cleanup_pending = False
+        self._cleanup_callbacks: List[Callable[[], None]] = []
+        self._stop_event = threading.Event()
+
+    @property
+    def is_stopped(self) -> bool:
+        return self._stopped
+
+    @property
+    def stop_requested_event(self) -> threading.Event:
+        """Observable event set as soon as emergency stop is latched."""
+        return self._stop_event
+
+    def trigger_stop(self, cleanup_fn: Optional[Callable[[], None]] = None) -> None:
+        """Latch stopped state and schedule or execute cleanup.
+
+        If called reentrantly on the same thread from within an active dispatch,
+        defers cleanup until the outermost dispatch completes so that the action
+        and its bookkeeping finish before release functions run.
+        Otherwise, executes cleanup immediately serialized under lock.
+        """
+        self._stopped = True
+        self._stop_event.set()
+        with self._lock:
+            if cleanup_fn is not None:
+                self._cleanup_callbacks.append(cleanup_fn)
+            if self._dispatch_depth > 0:
+                # Reentrant on same thread inside an active dispatch!
+                self._cleanup_pending = True
+                return
+            self._run_deferred_cleanups()
+
+    def _run_deferred_cleanups(self) -> None:
+        """Run all queued cleanups. Must be called with self._lock held."""
+        self._cleanup_pending = False
+        callbacks = list(self._cleanup_callbacks)
+        self._cleanup_callbacks.clear()
+        cleanup_exc: Optional[Exception] = None
+        for cb in callbacks:
+            try:
+                cb()
+            except Exception as e:
+                if cleanup_exc is None:
+                    cleanup_exc = e
+        if cleanup_exc is not None:
+            raise cleanup_exc
+
+    def dispatch(self, action_fn: Callable[..., Any], *args, **kwargs) -> Any:
+        """Execute a forward action (move, click, down, scroll, zoom, swipe, key_down).
+
+        Refuses execution if stopped either before acquiring lock or after acquiring lock.
+        Increments dispatch depth to track in-flight actions.
+        On exit of the outermost dispatch, if an emergency stop was triggered reentrantly,
+        executes the deferred cleanup.
+        """
+        if self._stopped:
+            return None
+        with self._lock:
+            if self._stopped:
+                return None
+            self._dispatch_depth += 1
+            try:
+                return action_fn(*args, **kwargs)
+            finally:
+                self._dispatch_depth -= 1
+                if self._dispatch_depth == 0 and self._cleanup_pending:
+                    self._run_deferred_cleanups()
+
+    @contextlib.contextmanager
+    def transaction(self):
+        """Context manager providing serialized gate transaction for caller bookkeeping.
+
+        Refuses execution if gate is stopped. On exit of outermost transaction,
+        runs deferred cleanups if a reentrant stop was requested.
+        """
+        with self._lock:
+            if self._stopped:
+                yield False
+                return
+            self._dispatch_depth += 1
+            try:
+                yield True
+            finally:
+                self._dispatch_depth -= 1
+                if self._dispatch_depth == 0 and self._cleanup_pending:
+                    self._run_deferred_cleanups()
+
+    def release(self, release_fn: Callable[..., Any], *args, **kwargs) -> Any:
+        """Execute a release action (mouse_up, key_up, cleanup). Always permitted even when stopped."""
+        with self._lock:
+            return release_fn(*args, **kwargs)
+
+
+class EmergencyHotkey:
+    """Emergency hotkey listener with fail-closed registration contract."""
+
+    def __init__(self, hotkey: str, callback: Callable[[], None], dry_run: bool = False):
+        self.hotkey = hotkey
+        self.callback = callback
+        self.dry_run = dry_run
+        self._registered = False
+        self.keyboard = None
+        self._import_error: Optional[Exception] = None
+
+        if not dry_run:
+            try:
+                import keyboard
+                self.keyboard = keyboard
+            except ImportError as e:
+                self.keyboard = None
+                self._import_error = e
+
+    @property
+    def is_registered(self) -> bool:
+        return self._registered
+
+    def register(self) -> bool:
+        """Register the global emergency hotkey hook.
+
+        Returns True if registered (or in dry_run mode).
+        Raises RuntimeError if real control is enabled but registration fails.
+        """
+        if self.dry_run:
+            return True
+        if self._registered:
+            return True
+        if self.keyboard is None:
+            raise RuntimeError(
+                f"Cannot register emergency hotkey: 'keyboard' library unavailable ({self._import_error})"
+            )
+        try:
+            self.keyboard.add_hotkey(self.hotkey, self.callback)
+            self._registered = True
+            return True
+        except Exception as e:
+            self._registered = False
+            raise RuntimeError(f"Failed to register emergency hotkey '{self.hotkey}': {e}") from e
+
+    def unregister(self) -> None:
+        """Unregister the hotkey hook.
+
+        Success-only: only clears _registered flag if remove_hotkey succeeds.
+        On failure, retains _registered=True for retry and propagates the exception.
+        """
+        if self.dry_run or not self._registered:
+            return
+        if self.keyboard is None:
+            raise RuntimeError(
+                f"Cannot unregister emergency hotkey '{self.hotkey}': 'keyboard' library unavailable ({self._import_error})"
+            )
+        try:
+            self.keyboard.remove_hotkey(self.hotkey)
+            self._registered = False
+        except Exception as e:
+            logger.error(f"Failed to unregister emergency hotkey '{self.hotkey}': {e}")
+            raise RuntimeError(f"Failed to unregister emergency hotkey '{self.hotkey}': {e}") from e
+
+    def trigger_emergency(self) -> None:
+        """Manually trigger for testing or dry_run."""
+        self.callback()

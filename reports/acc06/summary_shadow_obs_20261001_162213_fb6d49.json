@@ -1,0 +1,269 @@
+{
+  "task_id": "ACC-06",
+  "description": "ACC-06 Bounded Shadow-Only Fresh Observation Trial Summary",
+  "metadata": {
+    "session_id": "shadow_obs_20261001_162213_fb6d49",
+    "user_id": "tuana",
+    "role": "shadow_observation",
+    "provenance": "live_camera_observation",
+    "created_at": "2026-10-01T16:22:14.190286",
+    "candidate_bundle_path": "reports/acc05/candidate_personal_svm.json",
+    "candidate_bundle_sha256": "66091d52d9dd6848fd8e35fc2641a31c4c2ffc9008329a4d2e9f85f8dd1246be",
+    "detector_model_path": "models/hand_landmarker.task",
+    "detector_model_sha256": "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1",
+    "decision_threshold": 0.0,
+    "margin_threshold": 0.15,
+    "prep_duration_sec": 3.0,
+    "obs_duration_sec": 5.0,
+    "total_guided_stages": 12,
+    "commands_dispatched": 0,
+    "status": "INITIALIZING",
+    "end_time_iso": "2026-10-01T16:25:10.307342",
+    "trial_status": "COMPLETED",
+    "status_reason": "All 12 guided stages completed successfully"
+  },
+  "frame_counts": {
+    "total_frames_captured": 3320,
+    "waiting_frames": 1484,
+    "preparation_frames": 697,
+    "stable_observation_frames": 1139,
+    "stable_no_hand_frames": 234,
+    "stable_target_gesture_frames": 905
+  },
+  "no_hand_baseline_metrics": {
+    "total_stable_no_hand_frames": 234,
+    "hand_detected_count": 0,
+    "hand_detection_rate": 0.0,
+    "false_target_predictions_count": 0,
+    "other_predictions_count": 0,
+    "clean_no_hand_rate": 1.0
+  },
+  "target_gesture_metrics": {
+    "total_target_support": 905,
+    "hand_detected_count": 816,
+    "hand_detection_rate": 0.901657458563536,
+    "detector_loss_count": 89,
+    "rejections_count": 0,
+    "rejection_rate": 0.0,
+    "raw_accuracy": 0.8994475138121547,
+    "rejection_accuracy": 0.8994475138121547,
+    "macro_f1": 0.966000818361046,
+    "pinch_closed_recall": 1.0,
+    "pinch_middle_recall": 0.9772727272727273,
+    "other_to_target_count": 0,
+    "other_support": 198,
+    "other_to_target_rate": 0.0,
+    "per_class": {
+      "PINCH_CLOSED": {
+        "support": 89,
+        "detected_frames": 89,
+        "detection_rate": 1.0,
+        "correct_rejection": 89,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      },
+      "PINCH_MIDDLE": {
+        "support": 88,
+        "detected_frames": 88,
+        "detection_rate": 1.0,
+        "correct_rejection": 86,
+        "recall": 0.9772727272727273,
+        "precision": 1.0,
+        "f1": 0.9885057471264368
+      },
+      "L_SHAPE": {
+        "support": 88,
+        "detected_frames": 88,
+        "detection_rate": 1.0,
+        "correct_rejection": 88,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      },
+      "OTHER": {
+        "support": 198,
+        "detected_frames": 109,
+        "detection_rate": 0.5505050505050505,
+        "correct_rejection": 109,
+        "recall": 0.5505050505050505,
+        "precision": 0.9819819819819819,
+        "f1": 0.7055016181229774
+      },
+      "POINT_ONE": {
+        "support": 82,
+        "detected_frames": 82,
+        "detection_rate": 1.0,
+        "correct_rejection": 82,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      },
+      "OPEN_PALM": {
+        "support": 87,
+        "detected_frames": 87,
+        "detection_rate": 1.0,
+        "correct_rejection": 87,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      },
+      "FIST": {
+        "support": 93,
+        "detected_frames": 93,
+        "detection_rate": 1.0,
+        "correct_rejection": 93,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      },
+      "TWO_FINGERS_PARALLEL": {
+        "support": 93,
+        "detected_frames": 93,
+        "detection_rate": 1.0,
+        "correct_rejection": 93,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      },
+      "THREE_FINGERS": {
+        "support": 87,
+        "detected_frames": 87,
+        "detection_rate": 1.0,
+        "correct_rejection": 87,
+        "recall": 1.0,
+        "precision": 1.0,
+        "f1": 1.0
+      }
+    }
+  },
+  "stages_breakdown": [
+    {
+      "stage_index": 0,
+      "stage_id": 1,
+      "intended_label": "NO_HAND",
+      "display_name": "NO_HAND (Initial Baseline)",
+      "total_frames": 203,
+      "prep_frames": 76,
+      "stable_frames": 127,
+      "stable_hand_detected_frames": 0
+    },
+    {
+      "stage_index": 1,
+      "stage_id": 2,
+      "intended_label": "PINCH_CLOSED",
+      "display_name": "[1] PINCH_CLOSED",
+      "total_frames": 159,
+      "prep_frames": 70,
+      "stable_frames": 89,
+      "stable_hand_detected_frames": 89
+    },
+    {
+      "stage_index": 2,
+      "stage_id": 3,
+      "intended_label": "PINCH_MIDDLE",
+      "display_name": "[2] PINCH_MIDDLE",
+      "total_frames": 152,
+      "prep_frames": 64,
+      "stable_frames": 88,
+      "stable_hand_detected_frames": 88
+    },
+    {
+      "stage_index": 3,
+      "stage_id": 4,
+      "intended_label": "L_SHAPE",
+      "display_name": "[3] L_SHAPE",
+      "total_frames": 140,
+      "prep_frames": 52,
+      "stable_frames": 88,
+      "stable_hand_detected_frames": 88
+    },
+    {
+      "stage_index": 4,
+      "stage_id": 5,
+      "intended_label": "OTHER",
+      "display_name": "[4] OTHER",
+      "total_frames": 141,
+      "prep_frames": 53,
+      "stable_frames": 88,
+      "stable_hand_detected_frames": 88
+    },
+    {
+      "stage_index": 5,
+      "stage_id": 6,
+      "intended_label": "POINT_ONE",
+      "display_name": "[5] POINT_ONE",
+      "total_frames": 134,
+      "prep_frames": 52,
+      "stable_frames": 82,
+      "stable_hand_detected_frames": 82
+    },
+    {
+      "stage_index": 6,
+      "stage_id": 7,
+      "intended_label": "OPEN_PALM",
+      "display_name": "[6] OPEN_PALM",
+      "total_frames": 137,
+      "prep_frames": 50,
+      "stable_frames": 87,
+      "stable_hand_detected_frames": 87
+    },
+    {
+      "stage_index": 7,
+      "stage_id": 8,
+      "intended_label": "FIST",
+      "display_name": "[7] FIST",
+      "total_frames": 149,
+      "prep_frames": 56,
+      "stable_frames": 93,
+      "stable_hand_detected_frames": 93
+    },
+    {
+      "stage_index": 8,
+      "stage_id": 9,
+      "intended_label": "TWO_FINGERS_PARALLEL",
+      "display_name": "[8] TWO_FINGERS_PARALLEL",
+      "total_frames": 149,
+      "prep_frames": 56,
+      "stable_frames": 93,
+      "stable_hand_detected_frames": 93
+    },
+    {
+      "stage_index": 9,
+      "stage_id": 10,
+      "intended_label": "THREE_FINGERS",
+      "display_name": "[9] THREE_FINGERS",
+      "total_frames": 142,
+      "prep_frames": 55,
+      "stable_frames": 87,
+      "stable_hand_detected_frames": 87
+    },
+    {
+      "stage_index": 10,
+      "stage_id": 11,
+      "intended_label": "OTHER",
+      "display_name": "OTHER (Post-Gesture Catch-All)",
+      "total_frames": 163,
+      "prep_frames": 53,
+      "stable_frames": 110,
+      "stable_hand_detected_frames": 21
+    },
+    {
+      "stage_index": 11,
+      "stage_id": 12,
+      "intended_label": "NO_HAND",
+      "display_name": "NO_HAND (Final Post-Trial Negative)",
+      "total_frames": 167,
+      "prep_frames": 60,
+      "stable_frames": 107,
+      "stable_hand_detected_frames": 0
+    }
+  ],
+  "protocol_notes": {
+    "disclaimer": "Start labels are declared intended poses, not independently verified physical ground truth.",
+    "denominator_rule": "Detector losses (no-hand frames) during target stages are strictly INCLUDED in denominator as errors.",
+    "macro_f1_rule": "Macro-F1 is strictly averaged over a fixed 9-class denominator (support-0 classes contribute 0.0).",
+    "action_commands_dispatched": 0,
+    "statistical_claims": "Zero frame-i.i.d. significance claims. Evaluated on single-user same-day capture take."
+  }
+}

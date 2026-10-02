@@ -1,0 +1,90 @@
+{
+  "slow_continuous_scroll": {
+    "legacy": {
+      "profile": "legacy",
+      "frames": 100,
+      "actions_fired": {},
+      "total_events": 0,
+      "total_scroll_units": 0,
+      "forbidden_moves": 0,
+      "forbidden_clicks": 0,
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "hybrid": {
+      "profile": "hybrid",
+      "frames": 100,
+      "actions_fired": {
+        "SCROLL": 23
+      },
+      "total_events": 23,
+      "total_scroll_units": 23,
+      "forbidden_moves": 0,
+      "forbidden_clicks": 0,
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "hybrid_accumulation_ratio": 1.0
+  },
+  "stationary_jitter_suppression": {
+    "legacy": {
+      "profile": "legacy",
+      "frames": 100,
+      "actions_fired": {},
+      "total_events": 0,
+      "total_scroll_units": 0,
+      "forbidden_moves": 0,
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "hybrid": {
+      "profile": "hybrid",
+      "frames": 100,
+      "actions_fired": {},
+      "total_events": 0,
+      "total_scroll_units": 0,
+      "forbidden_moves": 0,
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "jitter_suppressed": true
+  },
+  "tab_switching_neutral_rearm_contract": {
+    "legacy": {
+      "profile": "legacy",
+      "actions_fired": {},
+      "total_events": 0,
+      "tab_key_events": 0,
+      "forbidden_moves": 0,
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "hybrid": {
+      "profile": "hybrid",
+      "actions_fired": {
+        "TAB_PREV": 1,
+        "TAB_NEXT": 1
+      },
+      "total_events": 10,
+      "tab_key_events": 2,
+      "forbidden_moves": 0,
+      "held_buttons_clean": true,
+      "held_keys_clean": true
+    },
+    "neutral_rearm_prevented_in_hybrid": true
+  },
+  "assist_off_transition": {
+    "profile": "hybrid_off",
+    "frames": 50,
+    "actions_fired": {},
+    "total_events": 0,
+    "held_buttons_clean": true,
+    "held_keys_clean": true
+  },
+  "safety_audit": {
+    "all_held_buttons_clean": true,
+    "all_held_keys_clean": true,
+    "forbidden_move_actions_hybrid": 0,
+    "forbidden_click_actions_hybrid": 0
+  }
+}

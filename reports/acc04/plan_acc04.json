@@ -1,0 +1,5 @@
+{
+  "tuana::tuana_train_rgb_20261001_110223_8ff3ed": "train",
+  "tuana::tuana_validation_rgb_20261001_112128_2a3fea": "validation",
+  "tuana::tuana_validation_retake_20261001_113202_dfcd6b": "validation"
+}

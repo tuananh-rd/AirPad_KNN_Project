@@ -1,0 +1,36 @@
+--- a/app.py
++++ b/app.py
+@@ -51,19 +51,23 @@
+     allow_real_control: bool = False,
+     model_bundle: Optional[ModelBundle] = None,
+ ) -> AirPadPipeline:
+-    """Build a fully-configured AirPadPipeline instance."""
++    from src.safety.failsafe import SafetyGate
++    gate = SafetyGate()
++
+     controller: PlatformController
+     if allow_real_control:
+         print(WARNING_BANNER)
+         from src.platform.windows import WindowsController
+-        controller = WindowsController(allow_real_control=True)
++        controller = WindowsController(allow_real_control=True, gate=gate)
+     else:
+         controller = DryRunController()
++        controller.gate = gate
+ 
+     gesture_cfg = config.get("gesture", {})
+     motion_cfg = config.get("motion", {})
+ 
+     fsm = GestureFSM(controller, gesture_cfg)
++    fsm.gate = gate
+     cursor_mapper = CursorMapper(
+         roi_x_min=motion_cfg.get("roi_x_min", 0.1),
+         roi_x_max=motion_cfg.get("roi_x_max", 0.9),
+@@ -142,6 +146,7 @@
+         rate_limiter=rate_limiter,
+         failsafe_monitor=failsafe_monitor,
+         emergency_hotkey=emergency_hotkey,
++        gate=gate,
+     )
+ 
+ 

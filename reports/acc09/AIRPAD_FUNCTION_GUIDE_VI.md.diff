@@ -1,0 +1,27 @@
+--- a/docs/AIRPAD_FUNCTION_GUIDE_VI.md
++++ b/docs/AIRPAD_FUNCTION_GUIDE_VI.md
+@@ -71,15 +71,20 @@
+ 
+ ## 6. Phím Tắt Khẩn Cấp & Giới Hạn An Toàn (Failsafe & Boundaries)
+ 
+-1. **Phím tắt dừng khẩn cấp (`Ctrl + Alt + Q`)**:
++1. **Phím tắt dừng khẩn cấp (`Ctrl + Alt + Q`) & Hợp đồng nghiệm thu an toàn**:
+    - Được đăng ký thông qua hook bàn phím mức thấp trên Windows.
+-   - Khi kích hoạt, pipeline chuyển vĩnh viễn sang trạng thái dừng khẩn cấp và nỗ lực giải phóng toàn bộ phím/chuột.
++   - **Cơ chế từ chối an toàn (Fail-Closed Admission)**: Khi khởi chạy với cờ `--real-control`, hệ thống bắt buộc kiểm tra và đăng ký thành công hook phím tắt khẩn cấp. Nếu thư viện `keyboard` bị thiếu hoặc đăng ký hook thất bại, chương trình lập tức từ chối khởi động và hoàn tác mọi tài nguyên một cách an toàn.
++   - **Đồng bộ hóa an toàn qua `SafetyGate`**:
++     - Lệnh dừng khẩn cấp chốt trạng thái `is_stopped = True` ngay tức thì.
++     - Toàn bộ hành vi điều khiển tiến tới (`mouse_move`, `mouse_click`, `mouse_down`, `scroll`, `zoom`, `swipe`, `key_down`) bị từ chối triệt để ngay sau khi dừng.
++     - Hành vi giải phóng (`mouse_up`, `key_up`, `cleanup`) được phép thực thi và đồng bộ hóa tuyến tính: các tác vụ đang thực thi dở dang hoàn tất ghi nhận trạng thái trước khi chuỗi giải phóng chạy.
++     - **Bảo lưu và thử lại khi lỗi giải phóng**: Nếu một nút chuột hoặc phím bấm gặp lỗi khi nhả trong lúc dọn dẹp, hệ thống không bỏ qua mà tiếp tục lưu giữ trong danh sách phím đang giữ để thử lại ở các lần dọn dẹp tiếp theo.
+    - **Khóa dừng vĩnh viễn (`Latched Stop`)**: Trạng thái dừng khẩn cấp này **không thể phục hồi thông qua bất kỳ cử chỉ bàn tay nào**. Người dùng bắt buộc phải đóng ứng dụng bằng phím `Q` hoặc `Esc` và khởi động lại chương trình để tiếp tục sử dụng.
+-   - *Giới hạn kỹ thuật*: Việc đăng ký phụ thuộc vào quyền hook bàn phím của hệ điều hành. Nếu luồng camera hoặc tiến trình chính bị treo sâu, phím tắt không thể bảo đảm an toàn phần cứng tuyệt đối.
++   - *Giới hạn kỹ thuật*: Việc đăng ký phụ thuộc vào quyền hook bàn phím của hệ điều hành. Nếu luồng camera hoặc tiến trình chính bị treo sâu ở tầng driver hệ thống, phím tắt không thể bảo đảm an toàn phần cứng tuyệt đối.
+ 2. **Góc dừng an toàn (`Failsafe Corner`)**:
+    - Kiểm tra dựa trên **tọa độ pipeline đã ánh xạ** (`mapped_pos`), không phải tọa độ thực tế của con trỏ chuột vật lý.
+    - Mặc định trong lớp `FailsafeMonitor` là phạm vi 10 pixel (`corner_size = 10`), và được khởi tạo trong `app.py` là 15 pixel (`corner_size = 15`).
+-   - Nếu tọa độ ánh xạ nằm trong vùng góc màn hình này, hệ thống sẽ tự động chuyển sang dừng khẩn cấp.
++   - Nếu tọa độ ánh xạ nằm trong vùng góc màn hình này, hệ thống sẽ tự động kích hoạt dừng khẩn cấp qua `SafetyGate`.
+ 3. **Phím đóng giao diện (`Q` hoặc `Esc`)**:
+    - Nhấn `Q` hoặc `Esc` khi cửa sổ xem trước OpenCV "AirPad Virtual Pad" đang có tiêu điểm (focus) để đóng camera và kết thúc chương trình.
+ 

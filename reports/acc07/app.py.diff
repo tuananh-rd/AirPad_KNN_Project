@@ -1,0 +1,152 @@
+--- a/app.py
++++ b/app.py
+@@ -295,7 +295,11 @@
+     from src.vision.adapter import MediaPipeAdapter
+ 
+     config = load_config()
+-    if model_path is None and os.path.exists("models/airpad_svm.json"):
++    if model_path is not None:
++        if not os.path.exists(model_path):
++            print(f"\n[ERROR] Model file not found at: {model_path}\n")
++            return 1
++    elif os.path.exists("models/airpad_svm.json"):
+         model_path = "models/airpad_svm.json"
+ 
+     bundle: Optional[ModelBundle] = None
+@@ -303,30 +307,38 @@
+         from tools.train import load_bundle
+         bundle = load_bundle(model_path)
+ 
+-    pipeline = create_pipeline(config, allow_real_control=allow_real_control, model_bundle=bundle)
+-    detector = MediaPipeAdapter(static_image_mode=False, max_num_hands=1)
+-
+-    cap = cv2.VideoCapture(0)
+-    if not cap.isOpened():
+-        print("[ERROR] Could not open webcam device index 0.")
+-        return 1
+-
+-    print("\nAirPad live camera loop started. Press ESC to quit.\n")
+-    prev_time = time.time()
++    pipeline: Optional[AirPadPipeline] = None
++    detector: Optional[MediaPipeAdapter] = None
++    cap: Optional[Any] = None
++
++    primary_exc: Optional[BaseException] = None
++    cleanup_exceptions: List[Exception] = []
+ 
+     try:
++        pipeline = create_pipeline(config, allow_real_control=allow_real_control, model_bundle=bundle)
++        detector = MediaPipeAdapter(static_image_mode=False, max_num_hands=1)
++
++        cap = cv2.VideoCapture(0)
++        if not cap.isOpened():
++            print("[ERROR] Could not open webcam device index 0.")
++            return 1
++
++        print("\nAirPad live camera loop started. Press ESC to quit.\n")
++        prev_time = time.time()
++
+         while True:
+             ret, frame = cap.read()
+-            if not ret:
++            if not ret or frame is None:
+                 break
+ 
+             # Mirror view for natural interaction
+-            frame = cv2.flip(frame, 1)
+-            h, w, _ = frame.shape
++            flipped_bgr = cv2.flip(frame, 1)
++            h, w, _ = flipped_bgr.shape
+             timestamp_ms = time.time() * 1000.0
+ 
+-            # Hand detection
+-            detected_hands = detector.detect(frame)
++            # Hand detection requires RGB, but OpenCV provides BGR
++            rgb_frame = cv2.cvtColor(flipped_bgr, cv2.COLOR_BGR2RGB)
++            detected_hands = detector.detect(rgb_frame)
+             landmarks_np: Optional[np.ndarray] = None
+             handedness = "Right"
+ 
+@@ -347,10 +359,10 @@
+                 for p1, p2 in connections:
+                     pt1 = (int(lms_pts[p1].x * w), int(lms_pts[p1].y * h))
+                     pt2 = (int(lms_pts[p2].x * w), int(lms_pts[p2].y * h))
+-                    cv2.line(frame, pt1, pt2, (255, 200, 0), 1)
++                    cv2.line(flipped_bgr, pt1, pt2, (255, 200, 0), 1)
+                 for pt in lms_pts:
+                     px, py = int(pt.x * w), int(pt.y * h)
+-                    cv2.circle(frame, (px, py), 4, (0, 255, 0), -1)
++                    cv2.circle(flipped_bgr, (px, py), 4, (0, 255, 0), -1)
+ 
+             res = pipeline.process_landmarks(landmarks_np, handedness=handedness, timestamp_ms=timestamp_ms)
+ 
+@@ -360,13 +372,13 @@
+             prev_time = curr_time
+ 
+             # Status Overlay
+-            cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+-            cv2.putText(frame, f"Pose: {res.filtered_pose.name}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+-            cv2.putText(frame, f"FSM: {res.fsm_state.name}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
++            cv2.putText(flipped_bgr, f"FPS: {fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
++            cv2.putText(flipped_bgr, f"Pose: {res.filtered_pose.name}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
++            cv2.putText(flipped_bgr, f"FSM: {res.fsm_state.name}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+             if res.action_fired:
+-                cv2.putText(frame, f"Action: {res.action_fired}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
++                cv2.putText(flipped_bgr, f"Action: {res.action_fired}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+             if pipeline.is_emergency_stopped:
+-                cv2.putText(frame, "EMERGENCY STOPPED! (Ctrl+Alt+Q / Corner)", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
++                cv2.putText(flipped_bgr, "EMERGENCY STOPPED! (Ctrl+Alt+Q / Corner)", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+ 
+             # Draw active ROI
+             motion_cfg = config.get("motion", {})
+@@ -374,18 +386,44 @@
+             rx2 = int(motion_cfg.get("roi_x_max", 0.9) * w)
+             ry1 = int(motion_cfg.get("roi_y_min", 0.1) * h)
+             ry2 = int(motion_cfg.get("roi_y_max", 0.9) * h)
+-            cv2.rectangle(frame, (rx1, ry1), (rx2, ry2), (255, 128, 0), 1)
+-
+-            cv2.imshow("AirPad Virtual Pad", frame)
++            cv2.rectangle(flipped_bgr, (rx1, ry1), (rx2, ry2), (255, 128, 0), 1)
++
++            cv2.imshow("AirPad Virtual Pad", flipped_bgr)
+             key = cv2.waitKey(1) & 0xFF
+             if key in (27, ord('q')):  # ESC or q
+                 break
+ 
+         return 0
++    except BaseException as e:
++        primary_exc = e
++        raise
+     finally:
+-        pipeline.cleanup()
+-        cap.release()
+-        cv2.destroyAllWindows()
++        if detector is not None and hasattr(detector, "close"):
++            try:
++                detector.close()
++            except Exception as e:
++                logger.warning(f"Error during detector cleanup: {e}")
++                cleanup_exceptions.append(e)
++        if pipeline is not None and hasattr(pipeline, "cleanup"):
++            try:
++                pipeline.cleanup()
++            except Exception as e:
++                logger.warning(f"Error during pipeline cleanup: {e}")
++                cleanup_exceptions.append(e)
++        if cap is not None and hasattr(cap, "release"):
++            try:
++                cap.release()
++            except Exception as e:
++                logger.warning(f"Error releasing camera: {e}")
++                cleanup_exceptions.append(e)
++        try:
++            cv2.destroyAllWindows()
++        except Exception as e:
++            logger.warning(f"Error destroying windows: {e}")
++            cleanup_exceptions.append(e)
++
++        if primary_exc is None and cleanup_exceptions:
++            raise cleanup_exceptions[0]
+ 
+ 
+ def main(args: Optional[List[str]] = None) -> int:

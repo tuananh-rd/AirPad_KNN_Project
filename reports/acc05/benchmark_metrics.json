@@ -1,0 +1,1823 @@
+{
+  "task_id": "ACC-05",
+  "description": "ACC-05 Single Frozen Personal SVM Paired Benchmark Metrics",
+  "inputs": {
+    "train_rgb": {
+      "path": "data/cohort/tuana_train_rgb_20261001_110223_8ff3ed.npz",
+      "sha256": "0f9d21b5b1a5ccab0ffc8f555d7c00e14b26fa2299040b9ab587b236e7d1014e",
+      "rows": 1692
+    },
+    "val_clean": {
+      "path": "data/cohort/curated/acc04_validation_clean.npz",
+      "sha256": "e0a27d1bd989a1ac1fe9fccc90c9ae57a47a8ca0637f1959cab91a4fcc99000d",
+      "rows": 1331
+    },
+    "val_retake": {
+      "path": "data/cohort/tuana_validation_retake_20261001_113202_dfcd6b.npz",
+      "sha256": "fe26b606921386a0f640dc958e4e7ebf01e43ce0d6cd6f07e693fce517db8948",
+      "rows": 415
+    },
+    "test_rgb": {
+      "path": "data/cohort/tuana_test_rgb_20261001_115837_5741bd.npz",
+      "sha256": "4ec1cf2dfbdcd74b5c22c914a31c52bf2fd3c11d5c3a4de5a49368eb9cca28fb",
+      "rows": 1663
+    },
+    "baseline_bundle": {
+      "path": "models/airpad_svm.json",
+      "sha256": "4cc3c55f5e4b571c5462de31afd6d5c4db64c803466d306cdefab34b31d7b977"
+    },
+    "candidate_bundle": {
+      "path": "reports/acc05/candidate_personal_svm.json",
+      "sha256": "66091d52d9dd6848fd8e35fc2641a31c4c2ffc9008329a4d2e9f85f8dd1246be"
+    }
+  },
+  "gates": {
+    "primary_gate_met": true,
+    "primary_gate_description": "Candidate test full-denominator accuracy and macro-F1 strictly above baseline on 1663 test rows",
+    "delta_accuracy": 0.6650631389055923,
+    "delta_macro_f1": 0.7505885812982326,
+    "secondary_recall_gate_met": true,
+    "secondary_recall_gate_description": "No per-class recall drop exceeding 0.02",
+    "per_class_drops_exceeding_2pct": [],
+    "secondary_other_gate_met": true,
+    "secondary_other_gate_description": "No increase in OTHER-to-target false command count",
+    "baseline_other_to_target": 115,
+    "candidate_other_to_target": 33,
+    "delta_other_to_target": -82,
+    "secondary_gates_met": true
+  },
+  "paired_deltas_test_rejection": {
+    "delta_accuracy": 0.6650631389055923,
+    "delta_macro_f1": 0.7505885812982326,
+    "delta_balanced_accuracy": 0.6429835257338202,
+    "delta_coverage": 0.028863499699338546,
+    "delta_rejection_count": -48,
+    "contingency_table": {
+      "both_correct": 359,
+      "candidate_only_correct": 1164,
+      "baseline_only_correct": 58,
+      "both_wrong": 82,
+      "total": 1663
+    },
+    "per_class_recall_deltas": {
+      "PINCH_CLOSED": {
+        "baseline_recall": 0.639751552795031,
+        "candidate_recall": 0.6459627329192547,
+        "delta_recall": 0.006211180124223614,
+        "drop_exceeds_0_02": false
+      },
+      "PINCH_MIDDLE": {
+        "baseline_recall": 0.3416149068322981,
+        "candidate_recall": 0.6894409937888198,
+        "delta_recall": 0.34782608695652173,
+        "drop_exceeds_0_02": false
+      },
+      "L_SHAPE": {
+        "baseline_recall": 1.0,
+        "candidate_recall": 1.0,
+        "delta_recall": 0.0,
+        "drop_exceeds_0_02": false
+      },
+      "OTHER": {
+        "baseline_recall": 0.3612565445026178,
+        "candidate_recall": 0.8272251308900523,
+        "delta_recall": 0.46596858638743455,
+        "drop_exceeds_0_02": false
+      },
+      "POINT_ONE": {
+        "baseline_recall": 0.0,
+        "candidate_recall": 1.0,
+        "delta_recall": 1.0,
+        "drop_exceeds_0_02": false
+      },
+      "OPEN_PALM": {
+        "baseline_recall": 0.0,
+        "candidate_recall": 1.0,
+        "delta_recall": 1.0,
+        "drop_exceeds_0_02": false
+      },
+      "FIST": {
+        "baseline_recall": 0.027777777777777776,
+        "candidate_recall": 1.0,
+        "delta_recall": 0.9722222222222222,
+        "drop_exceeds_0_02": false
+      },
+      "TWO_FINGERS_PARALLEL": {
+        "baseline_recall": 0.0,
+        "candidate_recall": 1.0,
+        "delta_recall": 1.0,
+        "drop_exceeds_0_02": false
+      },
+      "THREE_FINGERS": {
+        "baseline_recall": 0.005376344086021506,
+        "candidate_recall": 1.0,
+        "delta_recall": 0.9946236559139785,
+        "drop_exceeds_0_02": false
+      }
+    }
+  },
+  "metrics": {
+    "validation": {
+      "baseline_raw": {
+        "macro_f1": 0.11515696602083864,
+        "accuracy": 0.18442153493699887,
+        "balanced_accuracy": 0.17747498722631017,
+        "support": 1746,
+        "coverage": 1.0,
+        "rejection_rate": 0.0,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 0.009615384615384616,
+            "recall": 0.03468208092485549,
+            "f1": 0.015056461731493099,
+            "support": 173
+          },
+          "PINCH_MIDDLE": {
+            "precision": 0.12,
+            "recall": 0.24705882352941178,
+            "f1": 0.16153846153846155,
+            "support": 170
+          },
+          "L_SHAPE": {
+            "precision": 0.3500837520938023,
+            "recall": 1.0,
+            "f1": 0.5186104218362283,
+            "support": 209
+          },
+          "OTHER": {
+            "precision": 0.37142857142857144,
+            "recall": 0.3155339805825243,
+            "f1": 0.34120734908136485,
+            "support": 206
+          },
+          "POINT_ONE": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 193
+          },
+          "OPEN_PALM": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 185
+          },
+          "FIST": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 195
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 202
+          },
+          "THREE_FINGERS": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 213
+          }
+        },
+        "confusion_matrix": [
+          [
+            6,
+            167,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            79,
+            42,
+            0,
+            49,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            209,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            141,
+            0,
+            65,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            193,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            124,
+            0,
+            0,
+            61,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            195,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            202,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            213,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ]
+      },
+      "baseline_rejection": {
+        "macro_f1": 0.12036278295541335,
+        "accuracy": 0.18442153493699887,
+        "balanced_accuracy": 0.17747498722631017,
+        "support": 1746,
+        "coverage": 0.9736540664375716,
+        "rejection_rate": 0.026345933562428408,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 0.009615384615384616,
+            "recall": 0.03468208092485549,
+            "f1": 0.015056461731493099,
+            "support": 173
+          },
+          "PINCH_MIDDLE": {
+            "precision": 0.12,
+            "recall": 0.24705882352941178,
+            "f1": 0.16153846153846155,
+            "support": 170
+          },
+          "L_SHAPE": {
+            "precision": 0.3500837520938023,
+            "recall": 1.0,
+            "f1": 0.5186104218362283,
+            "support": 209
+          },
+          "OTHER": {
+            "precision": 0.5038759689922481,
+            "recall": 0.3155339805825243,
+            "f1": 0.38805970149253727,
+            "support": 206
+          },
+          "POINT_ONE": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 193
+          },
+          "OPEN_PALM": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 185
+          },
+          "FIST": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 195
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 202
+          },
+          "THREE_FINGERS": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 213
+          }
+        },
+        "confusion_matrix": [
+          [
+            6,
+            167,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            79,
+            42,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            46
+          ],
+          [
+            0,
+            0,
+            209,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            141,
+            0,
+            65,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            193,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            124,
+            0,
+            0,
+            61,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            195,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            202,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            213,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS",
+          "UNKNOWN"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS",
+          "UNKNOWN"
+        ],
+        "rejection_count": 46
+      },
+      "candidate_raw": {
+        "macro_f1": 0.9478818729871755,
+        "accuracy": 0.9478808705612829,
+        "balanced_accuracy": 0.9516214779372674,
+        "support": 1746,
+        "coverage": 1.0,
+        "rejection_rate": 0.0,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 173
+          },
+          "PINCH_MIDDLE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 170
+          },
+          "L_SHAPE": {
+            "precision": 1.0,
+            "recall": 0.5645933014354066,
+            "f1": 0.7217125382262995,
+            "support": 209
+          },
+          "OTHER": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 206
+          },
+          "POINT_ONE": {
+            "precision": 0.6795774647887324,
+            "recall": 1.0,
+            "f1": 0.8092243186582808,
+            "support": 193
+          },
+          "OPEN_PALM": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 185
+          },
+          "FIST": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 195
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 202
+          },
+          "THREE_FINGERS": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 213
+          }
+        },
+        "confusion_matrix": [
+          [
+            173,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            170,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            118,
+            0,
+            91,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            206,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            193,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            185,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            195,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            202,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            213
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ]
+      },
+      "candidate_rejection": {
+        "macro_f1": 0.9478818729871755,
+        "accuracy": 0.9478808705612829,
+        "balanced_accuracy": 0.9516214779372674,
+        "support": 1746,
+        "coverage": 1.0,
+        "rejection_rate": 0.0,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 173
+          },
+          "PINCH_MIDDLE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 170
+          },
+          "L_SHAPE": {
+            "precision": 1.0,
+            "recall": 0.5645933014354066,
+            "f1": 0.7217125382262995,
+            "support": 209
+          },
+          "OTHER": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 206
+          },
+          "POINT_ONE": {
+            "precision": 0.6795774647887324,
+            "recall": 1.0,
+            "f1": 0.8092243186582808,
+            "support": 193
+          },
+          "OPEN_PALM": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 185
+          },
+          "FIST": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 195
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 202
+          },
+          "THREE_FINGERS": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 213
+          }
+        },
+        "confusion_matrix": [
+          [
+            173,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            170,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            118,
+            0,
+            91,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            206,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            193,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            185,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            195,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            202,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            213
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "rejection_count": 0
+      }
+    },
+    "test": {
+      "baseline_raw": {
+        "macro_f1": 0.1641986222389224,
+        "accuracy": 0.2555622369212267,
+        "balanced_accuracy": 0.26866465513433196,
+        "support": 1663,
+        "coverage": 1.0,
+        "rejection_rate": 0.0,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 0.1619496855345912,
+            "recall": 0.639751552795031,
+            "f1": 0.25846925972396484,
+            "support": 161
+          },
+          "PINCH_MIDDLE": {
+            "precision": 0.32934131736526945,
+            "recall": 0.3416149068322981,
+            "f1": 0.3353658536585366,
+            "support": 161
+          },
+          "L_SHAPE": {
+            "precision": 0.3303411131059246,
+            "recall": 1.0,
+            "f1": 0.4966261808367072,
+            "support": 184
+          },
+          "OTHER": {
+            "precision": 0.25675675675675674,
+            "recall": 0.39790575916230364,
+            "f1": 0.3121149897330595,
+            "support": 191
+          },
+          "POINT_ONE": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 199
+          },
+          "OPEN_PALM": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 220
+          },
+          "FIST": {
+            "precision": 1.0,
+            "recall": 0.03333333333333333,
+            "f1": 0.06451612903225806,
+            "support": 180
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 181
+          },
+          "THREE_FINGERS": {
+            "precision": 1.0,
+            "recall": 0.005376344086021506,
+            "f1": 0.010695187165775402,
+            "support": 186
+          }
+        },
+        "confusion_matrix": [
+          [
+            103,
+            1,
+            0,
+            57,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            53,
+            55,
+            0,
+            53,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            184,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            8,
+            107,
+            0,
+            76,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            199,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            160,
+            4,
+            0,
+            56,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            174,
+            0,
+            0,
+            0,
+            6,
+            0,
+            0
+          ],
+          [
+            181,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            131,
+            0,
+            0,
+            54,
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ]
+      },
+      "baseline_rejection": {
+        "macro_f1": 0.16310594760016325,
+        "accuracy": 0.2507516536380036,
+        "balanced_accuracy": 0.2639752362215273,
+        "support": 1663,
+        "coverage": 0.9711365003006615,
+        "rejection_rate": 0.028863499699338546,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 0.16246056782334384,
+            "recall": 0.639751552795031,
+            "f1": 0.2591194968553459,
+            "support": 161
+          },
+          "PINCH_MIDDLE": {
+            "precision": 0.32934131736526945,
+            "recall": 0.3416149068322981,
+            "f1": 0.3353658536585366,
+            "support": 161
+          },
+          "L_SHAPE": {
+            "precision": 0.3357664233576642,
+            "recall": 1.0,
+            "f1": 0.5027322404371585,
+            "support": 184
+          },
+          "OTHER": {
+            "precision": 0.2653846153846154,
+            "recall": 0.3612565445026178,
+            "f1": 0.3059866962305986,
+            "support": 191
+          },
+          "POINT_ONE": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 199
+          },
+          "OPEN_PALM": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 220
+          },
+          "FIST": {
+            "precision": 1.0,
+            "recall": 0.027777777777777776,
+            "f1": 0.05405405405405406,
+            "support": 180
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "support": 181
+          },
+          "THREE_FINGERS": {
+            "precision": 1.0,
+            "recall": 0.005376344086021506,
+            "f1": 0.010695187165775402,
+            "support": 186
+          }
+        },
+        "confusion_matrix": [
+          [
+            103,
+            1,
+            0,
+            57,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            53,
+            55,
+            0,
+            53,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            184,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            8,
+            107,
+            0,
+            69,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7
+          ],
+          [
+            0,
+            0,
+            199,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            158,
+            4,
+            0,
+            27,
+            0,
+            0,
+            0,
+            0,
+            0,
+            31
+          ],
+          [
+            0,
+            0,
+            165,
+            0,
+            0,
+            0,
+            5,
+            0,
+            0,
+            10
+          ],
+          [
+            181,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            131,
+            0,
+            0,
+            54,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS",
+          "UNKNOWN"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS",
+          "UNKNOWN"
+        ],
+        "rejection_count": 48
+      },
+      "candidate_raw": {
+        "macro_f1": 0.9136945288983959,
+        "accuracy": 0.9158147925435959,
+        "balanced_accuracy": 0.9069587619553475,
+        "support": 1663,
+        "coverage": 1.0,
+        "rejection_rate": 0.0,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 1.0,
+            "recall": 0.6459627329192547,
+            "f1": 0.7849056603773585,
+            "support": 161
+          },
+          "PINCH_MIDDLE": {
+            "precision": 1.0,
+            "recall": 0.6894409937888198,
+            "f1": 0.8161764705882352,
+            "support": 161
+          },
+          "L_SHAPE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 184
+          },
+          "OTHER": {
+            "precision": 0.7596153846153846,
+            "recall": 0.8272251308900523,
+            "f1": 0.7919799498746867,
+            "support": 191
+          },
+          "POINT_ONE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 199
+          },
+          "OPEN_PALM": {
+            "precision": 0.7096774193548387,
+            "recall": 1.0,
+            "f1": 0.8301886792452831,
+            "support": 220
+          },
+          "FIST": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 180
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 181
+          },
+          "THREE_FINGERS": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 186
+          }
+        },
+        "confusion_matrix": [
+          [
+            104,
+            0,
+            0,
+            0,
+            0,
+            57,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            111,
+            0,
+            50,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            184,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            158,
+            0,
+            33,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            199,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            220,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            180,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            181,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            186
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ]
+      },
+      "candidate_rejection": {
+        "macro_f1": 0.9136945288983959,
+        "accuracy": 0.9158147925435959,
+        "balanced_accuracy": 0.9069587619553475,
+        "support": 1663,
+        "coverage": 1.0,
+        "rejection_rate": 0.0,
+        "per_class": {
+          "PINCH_CLOSED": {
+            "precision": 1.0,
+            "recall": 0.6459627329192547,
+            "f1": 0.7849056603773585,
+            "support": 161
+          },
+          "PINCH_MIDDLE": {
+            "precision": 1.0,
+            "recall": 0.6894409937888198,
+            "f1": 0.8161764705882352,
+            "support": 161
+          },
+          "L_SHAPE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 184
+          },
+          "OTHER": {
+            "precision": 0.7596153846153846,
+            "recall": 0.8272251308900523,
+            "f1": 0.7919799498746867,
+            "support": 191
+          },
+          "POINT_ONE": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 199
+          },
+          "OPEN_PALM": {
+            "precision": 0.7096774193548387,
+            "recall": 1.0,
+            "f1": 0.8301886792452831,
+            "support": 220
+          },
+          "FIST": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 180
+          },
+          "TWO_FINGERS_PARALLEL": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 181
+          },
+          "THREE_FINGERS": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "support": 186
+          }
+        },
+        "confusion_matrix": [
+          [
+            104,
+            0,
+            0,
+            0,
+            0,
+            57,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            111,
+            0,
+            50,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            184,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            158,
+            0,
+            33,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            199,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            220,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            180,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            181,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            186
+          ]
+        ],
+        "confusion_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_row_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "confusion_matrix_col_labels": [
+          "PINCH_CLOSED",
+          "PINCH_MIDDLE",
+          "L_SHAPE",
+          "OTHER",
+          "POINT_ONE",
+          "OPEN_PALM",
+          "FIST",
+          "TWO_FINGERS_PARALLEL",
+          "THREE_FINGERS"
+        ],
+        "rejection_count": 0
+      }
+    }
+  }
+}

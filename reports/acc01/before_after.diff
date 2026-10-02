@@ -1,0 +1,1628 @@
+--- a/src/ml/evaluation.py
++++ b/src/ml/evaluation.py
+@@ -1,77 +1,268 @@
+ import numpy as np
+-from typing import Dict, Any, Tuple, Generator, List, Optional
+-
+-def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray, labels: Optional[List[Any]] = None) -> Dict[str, Any]:
+-    """Compute macro-F1, per-class precision/recall, confusion matrix.
+-    All from scratch using NumPy (no sklearn dependency)."""
++from typing import Dict, Any, Tuple, Generator, List, Optional, Union
++from src.gesture.pose import HandPose
++
++
++def is_unknown_prediction(
++    prediction: Any,
++    target_labels: Optional[List[Any]] = None,
++    unknown_label: Any = "UNKNOWN",
++) -> bool:
++    """Determine whether a predicted label represents an UNKNOWN / rejected prediction.
++
++    If the label is in target_labels, it is treated as a valid target class,
++    not an unknown/rejection.
++    """
++    if target_labels is not None and prediction in target_labels:
++        return False
++    if prediction is None:
++        return True
++    if isinstance(prediction, str) and prediction.strip().upper() == "UNKNOWN":
++        return True
++    if hasattr(prediction, "name") and getattr(prediction, "name") == "UNKNOWN":
++        return True
++    if isinstance(prediction, HandPose) and prediction == HandPose.UNKNOWN:
++        return True
++    if unknown_label is not None and prediction == unknown_label:
++        return True
++    return False
++
++
++def compute_metrics(
++    y_true: Union[List[Any], np.ndarray],
++    y_pred: Union[List[Any], np.ndarray],
++    labels: Optional[List[Any]] = None,
++    unknown_label: Any = "UNKNOWN",
++) -> Dict[str, Any]:
++    """Compute trustworthy classification metrics with proper UNKNOWN / rejection handling.
++
++    - Computes macro-F1 strictly across the fixed target classes in `labels`.
++    - UNKNOWN predictions are treated as false negatives / rejections in the full denominator.
++    - An UNKNOWN prediction column is included in the confusion matrix when rejections occur,
++      without introducing UNKNOWN as an extra target class in macro-F1.
++    - Unexpected true or predicted labels raise ValueError clearly.
++    - Provides accuracy, balanced accuracy, support, precision/recall/F1,
++      coverage, rejection rate, and row/column labels for the confusion matrix.
++    """
++    y_true_list = list(y_true)
++    y_pred_list = list(y_pred)
++
++    if len(y_true_list) != len(y_pred_list):
++        raise ValueError(
++            f"Length mismatch: {len(y_true_list)} ground truth labels vs {len(y_pred_list)} predictions"
++        )
++
+     if labels is None:
+-        labels = np.unique(np.concatenate((y_true, y_pred))).tolist()
+-    
++        # Infer target classes from ground truth (excluding UNKNOWN if present)
++        inferred = []
++        for t in y_true_list:
++            if not is_unknown_prediction(t, None, unknown_label) and t not in inferred:
++                inferred.append(t)
++        if not inferred:
++            # Fallback if y_true only contains unknown
++            for t in y_true_list:
++                if t not in inferred:
++                    inferred.append(t)
++        labels = inferred
++    else:
++        labels = list(labels)
++
+     n_classes = len(labels)
+     label_to_idx = {label: idx for idx, label in enumerate(labels)}
+-    
+-    cm = np.zeros((n_classes, n_classes), dtype=int)
+-    for t, p in zip(y_true, y_pred):
+-        if t in label_to_idx and p in label_to_idx:
+-            cm[label_to_idx[t], label_to_idx[p]] += 1
+-            
++
++    # Validate ground truth labels
++    for t in y_true_list:
++        if t not in label_to_idx:
++            raise ValueError(f"Unexpected ground truth label '{t}' not in target classes: {labels}")
++
++    # Check for presence of UNKNOWN predictions
++    has_unknown = any(is_unknown_prediction(p, labels, unknown_label) for p in y_pred_list)
++
++    # Validate predicted labels
++    for p in y_pred_list:
++        if p not in label_to_idx and not is_unknown_prediction(p, labels, unknown_label):
++            raise ValueError(
++                f"Unexpected prediction label '{p}' not in target classes {labels} and not recognizable UNKNOWN"
++            )
++
++    # Construct confusion matrix
++    # Rows: ground truth classes in `labels`
++    # Columns: predicted classes in `labels`, plus UNKNOWN column if present
++    n_cols = n_classes + (1 if has_unknown else 0)
++    cm = np.zeros((n_classes, n_cols), dtype=int)
++
++    for t, p in zip(y_true_list, y_pred_list):
++        row_idx = label_to_idx[t]
++        if p in label_to_idx:
++            col_idx = label_to_idx[p]
++            cm[row_idx, col_idx] += 1
++        else:
++            # Rejection / UNKNOWN column
++            cm[row_idx, n_classes] += 1
++
+     per_class = {}
+     f1_sum = 0.0
+-    valid_classes = 0
+-    
++    recalls_with_support = []
++    total_correct = 0
++
+     for i, label in enumerate(labels):
+-        tp = cm[i, i]
+-        fp = cm[:, i].sum() - tp
+-        fn = cm[i, :].sum() - tp
+-        
+-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+-        
++        tp = int(cm[i, i])
++        total_correct += tp
++
++        # False positives: other classes predicted as class i
++        fp = int(cm[:, i].sum() - tp)
++
++        # False negatives: class i predicted as any other class OR rejected as UNKNOWN
++        fn = int(cm[i, :].sum() - tp)
++        support = tp + fn
++
++        precision = float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
++        recall = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
++        f1 = float(2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
++
+         per_class[label] = {
+-            'precision': float(precision),
+-            'recall': float(recall),
+-            'f1': float(f1)
++            'precision': precision,
++            'recall': recall,
++            'f1': f1,
++            'support': support,
+         }
+-        
++
+         f1_sum += f1
+-        valid_classes += 1
+-        
+-    macro_f1 = f1_sum / valid_classes if valid_classes > 0 else 0.0
+-    
++        if support > 0:
++            recalls_with_support.append(recall)
++
++    macro_f1 = float(f1_sum / n_classes) if n_classes > 0 else 0.0
++    balanced_acc = float(np.mean(recalls_with_support)) if recalls_with_support else 0.0
++
++    total_samples = len(y_true_list)
++    accuracy = float(total_correct / total_samples) if total_samples > 0 else 0.0
++
++    rejected_count = int(cm[:, n_classes].sum()) if has_unknown else 0
++    rejection_rate = float(rejected_count / total_samples) if total_samples > 0 else 0.0
++    coverage = float(1.0 - rejection_rate)
++
++    row_labels = [lbl.name if hasattr(lbl, "name") else lbl for lbl in labels]
++    col_labels = list(row_labels)
++    if has_unknown:
++        col_labels.append("UNKNOWN")
++
+     return {
+-        'macro_f1': float(macro_f1),
++        'macro_f1': macro_f1,
++        'accuracy': accuracy,
++        'balanced_accuracy': balanced_acc,
++        'support': total_samples,
++        'coverage': coverage,
++        'rejection_rate': rejection_rate,
+         'per_class': per_class,
+-        'confusion_matrix': cm.tolist()
++        'confusion_matrix': cm.tolist(),
++        'confusion_row_labels': row_labels,
++        'confusion_col_labels': col_labels,
++        'confusion_matrix_row_labels': row_labels,
++        'confusion_matrix_col_labels': col_labels,
+     }
+ 
+-def group_kfold_split(X: np.ndarray, y: np.ndarray, groups: np.ndarray, n_splits: int = 5) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+-    """GroupKFold split - never splits consecutive frames from same session.
+-    groups: array of group IDs (user_id or session_id).
+-    Yields (train_idx, test_idx) tuples."""
++
++def group_kfold_split(
++    X: np.ndarray,
++    y: np.ndarray,
++    groups: np.ndarray,
++    n_splits: int = 5,
++    seed: int = 42,
++) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
++    """GroupKFold split - isolates groups between train and test folds with zero leakage.
++
++    Validation rules:
++    - Missing or empty group identifiers raise ValueError clearly.
++    - Insufficient unique group count (< n_splits) raises ValueError clearly.
++    - Deterministic split ordering controlled by seed.
++
++    Yields (train_idx, test_idx) tuples.
++    """
++    if groups is None:
++        raise ValueError("groups array cannot be None")
++
++    n_samples = len(X)
++    if len(groups) != n_samples:
++        raise ValueError(
++            f"Length mismatch: {n_samples} samples in X vs {len(groups)} group entries"
++        )
++
++    if n_splits < 2:
++        raise ValueError(f"n_splits must be at least 2, got {n_splits}")
++
++    # Validate no missing/empty/NaN groups
++    for idx, g in enumerate(groups):
++        if g is None:
++            raise ValueError(f"Group identifier at sample index {idx} is None")
++        if isinstance(g, str) and not g.strip():
++            raise ValueError(f"Group identifier at sample index {idx} is empty or whitespace string")
++        if isinstance(g, float) and np.isnan(g):
++            raise ValueError(f"Group identifier at sample index {idx} is NaN")
++
+     unique_groups = np.unique(groups)
+-    np.random.RandomState(42).shuffle(unique_groups) # Deterministic for consistent splits
+-    
+-    folds = np.array_split(unique_groups, n_splits)
+-    
++    n_unique = len(unique_groups)
++
++    if n_unique < n_splits:
++        raise ValueError(
++            f"Insufficient group count: found {n_unique} unique groups, "
++            f"which is less than n_splits={n_splits}. Cannot create {n_splits} disjoint group folds."
++        )
++
++    # Deterministic shuffle of unique groups
++    shuffled_groups = unique_groups.copy()
++    np.random.RandomState(seed).shuffle(shuffled_groups)
++
++    folds = np.array_split(shuffled_groups, n_splits)
++
+     for fold_groups in folds:
+         test_mask = np.isin(groups, fold_groups)
+         train_mask = ~test_mask
+-        
++
+         train_idx = np.where(train_mask)[0]
+         test_idx = np.where(test_mask)[0]
+-        
++
+         yield train_idx, test_idx
+ 
+-def leave_one_subject_out(X: np.ndarray, y: np.ndarray, subjects: np.ndarray) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
+-    """LOSO cross-validation. Yields (train_idx, test_idx) for each unique subject."""
++
++def leave_one_subject_out(
++    X: np.ndarray,
++    y: np.ndarray,
++    subjects: np.ndarray,
++) -> Generator[Tuple[np.ndarray, np.ndarray], None, None]:
++    """LOSO cross-validation. Yields (train_idx, test_idx) for each unique subject.
++
++    Validation rules:
++    - Missing or empty subject identifiers raise ValueError.
++    - Insufficient unique subject count (< 2) raises ValueError.
++    """
++    if subjects is None:
++        raise ValueError("subjects array cannot be None")
++
++    n_samples = len(X)
++    if len(subjects) != n_samples:
++        raise ValueError(
++            f"Length mismatch: {n_samples} samples in X vs {len(subjects)} subject entries"
++        )
++
++    for idx, s in enumerate(subjects):
++        if s is None:
++            raise ValueError(f"Subject identifier at sample index {idx} is None")
++        if isinstance(s, str) and not s.strip():
++            raise ValueError(f"Subject identifier at sample index {idx} is empty or whitespace string")
++        if isinstance(s, float) and np.isnan(s):
++            raise ValueError(f"Subject identifier at sample index {idx} is NaN")
++
+     unique_subjects = np.unique(subjects)
+-    
++    if len(unique_subjects) < 2:
++        raise ValueError(
++            f"LOSO cross-validation requires at least 2 unique subjects, found {len(unique_subjects)}"
++        )
++
+     for subject in unique_subjects:
+         test_mask = (subjects == subject)
+         train_mask = ~test_mask
+-        
++
+         train_idx = np.where(train_mask)[0]
+         test_idx = np.where(test_mask)[0]
+-        
++
+         yield train_idx, test_idx
+--- a/tools/train.py
++++ b/tools/train.py
+@@ -123,8 +123,22 @@
+     metadata: List[Dict[str, Any]],
+     group_key: str = "session_id",
+ ) -> np.ndarray:
+-    """Extract grouping IDs (e.g. session_id or user_id) from sample metadata."""
+-    return np.array([m.get(group_key, f"unknown_{i}") for i, m in enumerate(metadata)])
++    """Extract grouping IDs (e.g. session_id or user_id) from sample metadata.
++
++    Raises:
++        ValueError: If any metadata entry is missing group_key or has an empty/None/NaN value.
++    """
++    groups = []
++    for i, m in enumerate(metadata):
++        if not isinstance(m, dict):
++            raise ValueError(f"Metadata entry {i} is not a dict")
++        if group_key not in m:
++            raise ValueError(f"Metadata entry {i} is missing required group_key '{group_key}'")
++        val = m[group_key]
++        if val is None or (isinstance(val, str) and not val.strip()) or (isinstance(val, float) and np.isnan(val)):
++            raise ValueError(f"Metadata entry {i} has empty or invalid group_key '{group_key}': {val!r}")
++        groups.append(val)
++    return np.array(groups)
+ 
+ 
+ def evaluate_fold(
+@@ -170,9 +184,12 @@
+     )
+     X, y_arr, groups = X[trainable], y_arr[trainable], groups[trainable]
+     unique_groups = len(np.unique(groups))
+-    effective_splits = min(n_splits, unique_groups)
+-    if effective_splits < 2:
+-        effective_splits = 2
++    if unique_groups < n_splits:
++        raise ValueError(
++            f"Insufficient unique groups ({unique_groups}) for n_splits={n_splits}. "
++            f"Grouped cross-validation requires at least {n_splits} unique groups."
++        )
++    effective_splits = n_splits
+ 
+     measurements: List[Dict[str, Any]] = []
+     best_score = -1.0
+@@ -390,15 +407,11 @@
+     groups = extract_groups(meta_trainable, group_key=group_key)
+     unique_groups = np.unique(groups)
+     effective_group_key = group_key
+-    if len(unique_groups) < 2 and group_key == "user_id":
+-        alt_groups = extract_groups(meta_trainable, group_key="session_id")
+-        if len(np.unique(alt_groups)) >= 2:
+-            print(
+-                f"[WARN] Only 1 user_id found. Falling back to session_id grouping ({len(np.unique(alt_groups))} sessions)."
+-            )
+-            groups = alt_groups
+-            unique_groups = np.unique(groups)
+-            effective_group_key = "session_id"
++    if len(unique_groups) < n_splits:
++        raise ValueError(
++            f"Insufficient unique groups ({len(unique_groups)}) for group_key '{group_key}' "
++            f"with n_splits={n_splits}. Grouped cross-validation requires at least {n_splits} groups."
++        )
+ 
+     c_vals = c_values if c_values is not None else [1.0, 10.0]
+     gamma_vals = gamma_values if gamma_values is not None else ["scale", 0.01]
+--- /dev/null
++++ b/tools/audit/__init__.py
+@@ -0,0 +1 @@
++# AirPad audit tools package
+--- /dev/null
++++ b/tools/audit/provenance.py
+@@ -0,0 +1,303 @@
++"""Provenance audit utility for AirPad datasets.
++
++Validates the integrity, origin, and true groupings of samples in:
++- data/custom_airpad.npz
++- data/hagrid_airpad.npz
++- data/combined_airpad.npz
++
++Performs exact feature/label verification with multiplicity accounting,
++exposes synthetic chunk leakage, and generates the authoritative corrected group manifest.
++"""
++from __future__ import annotations
++
++import argparse
++from collections import defaultdict
++import hashlib
++import json
++import os
++import sys
++from typing import Any, Dict, List, Tuple
++
++# Ensure workspace root is in sys.path
++WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
++if WORKSPACE_ROOT not in sys.path:
++    sys.path.insert(0, WORKSPACE_ROOT)
++
++import numpy as np
++from tools.collect_data import load_dataset_npz
++
++# Baseline dataset and model hashes from Brain
++EXPECTED_HASHES = {
++    "custom": "498699e1f28a78031193476fbafff2a2cd307bb9d82a8baee6a57f3097019169",
++    "hagrid": "ec38045d608aa6d30386796e4e0586ff619468d4abfd755619835bb8fa61c081",
++    "combined": "c0c6d4e26c26f8a303077c6de971a54c2d4085444f9479cef9e021986cc9e8bf",
++    "model": "4cc3c55f5e4b571c5462de31afd6d5c4db64c803466d306cdefab34b31d7b977",
++}
++
++
++def compute_file_sha256(filepath: str) -> str:
++    """Compute hex SHA-256 digest of a file."""
++    h = hashlib.sha256()
++    with open(filepath, "rb") as f:
++        while chunk := f.read(1024 * 1024):
++            h.update(chunk)
++    return h.hexdigest()
++
++
++def audit_datasets(
++    combined_path: str = "data/combined_airpad.npz",
++    hagrid_path: str = "data/hagrid_airpad.npz",
++    custom_path: str = "data/custom_airpad.npz",
++    manifest_out: str = "reports/acc01/corrected_group_manifest.json",
++    report_out: str = "reports/acc01/audit_report.json",
++) -> Dict[str, Any]:
++    """Execute complete provenance audit and export corrected group manifest."""
++    # 1. Verify checksums
++    actual_hashes = {
++        "custom": compute_file_sha256(custom_path),
++        "hagrid": compute_file_sha256(hagrid_path),
++        "combined": compute_file_sha256(combined_path),
++    }
++
++    for key, expected in EXPECTED_HASHES.items():
++        if key in actual_hashes:
++            actual = actual_hashes[key]
++            if actual != expected:
++                raise ValueError(
++                    f"Checksum mismatch for {key}: expected {expected}, got {actual}"
++                )
++
++    # 2. Load datasets
++    c_feat, c_lbl, c_meta = load_dataset_npz(custom_path)
++    h_feat, h_lbl, h_meta = load_dataset_npz(hagrid_path)
++    comb_feat, comb_lbl, comb_meta = load_dataset_npz(combined_path)
++
++    n_hagrid = len(h_lbl)
++    n_custom = len(c_lbl)
++    n_combined = len(comb_lbl)
++
++    if n_combined != n_hagrid + n_custom:
++        raise ValueError(
++            f"Combined length {n_combined} does not match sum of HaGRID ({n_hagrid}) + Custom ({n_custom})"
++        )
++
++    # 3. Exact row verification for HaGRID segment [0 : n_hagrid]
++    print(f"Auditing {n_hagrid} HaGRID rows in combined dataset...")
++    if not np.array_equal(comb_feat[:n_hagrid], h_feat):
++        raise RuntimeError("HaGRID feature mismatch detected in combined dataset!")
++    if not np.array_equal(comb_lbl[:n_hagrid], h_lbl):
++        raise RuntimeError("HaGRID label mismatch detected in combined dataset!")
++
++    # 4. Multiplicity and duplicate analysis on custom dataset
++    print(f"Auditing {n_custom} Custom rows with multiplicity accounting...")
++    key_map = defaultdict(list)
++    for idx in range(n_custom):
++        k = (tuple(c_feat[idx]), str(c_lbl[idx]))
++        key_map[k].append(idx)
++
++    dup_keys = {k: v for k, v in key_map.items() if len(v) > 1}
++    max_multiplicity = max((len(v) for v in dup_keys.values()), default=1)
++    disambiguated_by_timestamp = 0
++    all_duplicates_agree_on_group = True
++
++    for k, indices in dup_keys.items():
++        timestamps = [c_meta[i]["timestamp"] for i in indices]
++        if len(set(timestamps)) == len(indices):
++            disambiguated_by_timestamp += 1
++        users = {c_meta[i]["user_id"] for i in indices}
++        sessions = {c_meta[i]["session_id"] for i in indices}
++        if len(users) > 1 or len(sessions) > 1:
++            all_duplicates_agree_on_group = False
++
++    print(
++        f"Custom dataset contains {len(dup_keys)} duplicate feature+label keys "
++        f"(max multiplicity: {max_multiplicity}), all {disambiguated_by_timestamp} disambiguated by timestamp."
++    )
++
++    # 5. Exact row verification for Custom segment [n_hagrid : n_combined]
++    if not np.array_equal(comb_feat[n_hagrid:], c_feat):
++        raise RuntimeError("Custom feature mismatch detected in combined dataset!")
++    if not np.array_equal(comb_lbl[n_hagrid:], c_lbl):
++        raise RuntimeError("Custom label mismatch detected in combined dataset!")
++
++    # 6. Build corrected manifest and detect synthetic chunk leakage
++    records = []
++    synthetic_chunk_users = set()
++    synthetic_chunk_sessions = set()
++
++    # Process HaGRID portion
++    for i in range(n_hagrid):
++        orig_m = h_meta[i]
++        comb_m = comb_meta[i]
++
++        u_id = orig_m.get("user_id")
++        s_id = orig_m.get("session_id")
++        if not u_id or not s_id:
++            raise ValueError(f"HaGRID row {i} missing user_id or session_id in metadata")
++
++        # Verify preserved timestamp, handedness, and label against original metadata
++        for k in ["timestamp", "handedness", "label"]:
++            if k in orig_m and orig_m[k] != comb_m.get(k):
++                raise RuntimeError(
++                    f"Metadata mismatch in HaGRID row {i} for '{k}': original {orig_m[k]!r} vs combined {comb_m.get(k)!r}"
++                )
++
++        records.append({
++            "sample_id": i,
++            "source": "hagrid",
++            "original_index": i,
++            "label": str(h_lbl[i]),
++            "timestamp": orig_m.get("timestamp"),
++            "handedness": orig_m.get("handedness"),
++            "true_user_id": u_id,
++            "true_session_id": s_id,
++            "combined_user_id": comb_m.get("user_id"),
++            "combined_session_id": comb_m.get("session_id"),
++            "is_leaky": False,
++        })
++
++    # Process Custom portion
++    custom_real_users = set()
++    custom_real_sessions = set()
++
++    for i in range(n_custom):
++        comb_idx = n_hagrid + i
++        orig_m = c_meta[i]
++        comb_m = comb_meta[comb_idx]
++
++        true_u = orig_m.get("user_id")
++        true_s = orig_m.get("session_id")
++        comb_u = comb_m.get("user_id")
++        comb_s = comb_m.get("session_id")
++
++        if not true_u or not true_s:
++            raise ValueError(f"Custom row {i} missing user_id or session_id in original metadata")
++
++        # Verify preserved timestamp, handedness, label, distance, lighting against original metadata
++        for k in ["timestamp", "handedness", "label", "distance_cm", "lighting", "is_transition", "feature_version"]:
++            if k in orig_m and orig_m[k] != comb_m.get(k):
++                raise RuntimeError(
++                    f"Metadata mismatch in Custom row {i} for '{k}': original {orig_m[k]!r} vs combined {comb_m.get(k)!r}"
++                )
++
++        custom_real_users.add(true_u)
++        custom_real_sessions.add(true_s)
++
++        is_leaky = (comb_u != true_u) or (comb_s != true_s)
++        if is_leaky:
++            synthetic_chunk_users.add(comb_u)
++            synthetic_chunk_sessions.add(comb_s)
++
++        records.append({
++            "sample_id": comb_idx,
++            "source": "custom",
++            "original_index": i,
++            "label": str(c_lbl[i]),
++            "timestamp": orig_m.get("timestamp"),
++            "handedness": orig_m.get("handedness"),
++            "true_user_id": true_u,
++            "true_session_id": true_s,
++            "combined_user_id": comb_u,
++            "combined_session_id": comb_s,
++            "is_leaky": is_leaky,
++        })
++
++    # Summary analysis
++    audit_summary = {
++        "status": "PASS",
++        "verified_hashes": actual_hashes,
++        "counts": {
++            "hagrid_samples": n_hagrid,
++            "custom_samples": n_custom,
++            "combined_samples": n_combined,
++        },
++        "multiplicity_audit": {
++            "duplicate_feature_label_keys": len(dup_keys),
++            "max_multiplicity": max_multiplicity,
++            "disambiguated_by_timestamp": disambiguated_by_timestamp,
++            "all_duplicates_agree_on_real_user_and_session": all_duplicates_agree_on_group,
++            "safe_group_match": all_duplicates_agree_on_group,
++        },
++        "custom_analysis": {
++            "real_users": sorted(list(custom_real_users)),
++            "real_sessions": sorted(list(custom_real_sessions)),
++            "synthetic_chunk_users": sorted(list(synthetic_chunk_users)),
++            "synthetic_chunk_sessions": sorted(list(synthetic_chunk_sessions)),
++            "leaky_samples_count": len([r for r in records if r["is_leaky"]]),
++            "custom_classes": sorted(list(set(str(l) for l in c_lbl))),
++            "unseen_user_eval_available": False,
++            "reason": (
++                "Only 1 real user ('tuana') and 1 real session ('sess_20260929_132034_7a13ed') "
++                "exist for the 3 custom classes (PINCH_CLOSED, PINCH_MIDDLE, L_SHAPE). "
++                "Partitioning into synthetic chunks (tuana_chunk0..4) caused 100% fold leakage in historical 5-fold CV. "
++                "Under strict true-user grouped cross-validation, 1 user cannot be partitioned across 5 folds; "
++                "unseen-user metrics for these 3 classes are strictly UNAVAILABLE."
++            ),
++        },
++        "hagrid_analysis": {
++            "n_users": len(set(r["true_user_id"] for r in records if r["source"] == "hagrid")),
++            "n_sessions": len(set(r["true_session_id"] for r in records if r["source"] == "hagrid")),
++            "classes": sorted(list(set(str(l) for l in h_lbl))),
++            "unseen_user_eval_available": True,
++        },
++    }
++
++    # Ensure output directory exists
++    for p in [manifest_out, report_out]:
++        os.makedirs(os.path.dirname(os.path.abspath(p)), exist_ok=True)
++
++    # Save manifest
++    manifest_data = {
++        "metadata": {
++            "created_at": "2026-09-30",
++            "total_samples": n_combined,
++            "combined_hash": actual_hashes["combined"],
++            "custom_hash": actual_hashes["custom"],
++            "hagrid_hash": actual_hashes["hagrid"],
++        },
++        "records": records,
++    }
++    with open(manifest_out, "w", encoding="utf-8") as f:
++        json.dump(manifest_data, f, indent=2)
++    print(f"Corrected group manifest saved to: {manifest_out}")
++
++    # Save report
++    with open(report_out, "w", encoding="utf-8") as f:
++        json.dump(audit_summary, f, indent=2)
++    print(f"Audit report saved to: {report_out}")
++
++    return audit_summary
++
++
++def main(argv: List[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description="Audit dataset provenance and generate corrected group manifest.")
++    parser.add_argument("--combined", default="data/combined_airpad.npz", help="Path to combined .npz")
++    parser.add_argument("--hagrid", default="data/hagrid_airpad.npz", help="Path to HaGRID .npz")
++    parser.add_argument("--custom", default="data/custom_airpad.npz", help="Path to custom .npz")
++    parser.add_argument("--manifest-out", default="reports/acc01/corrected_group_manifest.json", help="Output manifest path")
++    parser.add_argument("--report-out", default="reports/acc01/audit_report.json", help="Output report path")
++
++    args = parser.parse_args(argv)
++    try:
++        summary = audit_datasets(
++            combined_path=args.combined,
++            hagrid_path=args.hagrid,
++            custom_path=args.custom,
++            manifest_out=args.manifest_out,
++            report_out=args.report_out,
++        )
++        print("\n=== AUDIT SUMMARY ===")
++        print(f"Status: {summary['status']}")
++        print(f"Total samples: {summary['counts']['combined_samples']}")
++        print(f"Custom real user count: {len(summary['custom_analysis']['real_users'])} ({summary['custom_analysis']['real_users']})")
++        print(f"Synthetic chunk users found: {len(summary['custom_analysis']['synthetic_chunk_users'])}")
++        print(f"Multiplicity audit: {summary['multiplicity_audit']['duplicate_feature_label_keys']} keys (max {summary['multiplicity_audit']['max_multiplicity']}), all agree on group: {summary['multiplicity_audit']['all_duplicates_agree_on_real_user_and_session']}")
++        print(f"Unseen-user evaluation available for custom poses: {summary['custom_analysis']['unseen_user_eval_available']}")
++        return 0
++    except Exception as e:
++        print(f"[ERROR] Audit failed: {e}", file=sys.stderr)
++        return 1
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+--- /dev/null
++++ b/tools/evaluate.py
+@@ -0,0 +1,556 @@
++"""Clean fixed-seed evaluation CLI for AirPad RBF-SVM baseline.
++
++Strict zero-leakage evaluation protocol:
++- Scaler is fit exclusively on training fold.
++- Fixed hyperparameters (C=10.0, gamma=0.01, class_weight='balanced').
++- Rejection policy: decision_threshold=0.0, margin_threshold=0.15.
++- Metrics compute UNKNOWN as false negatives in full denominator.
++- Rejects synthetic chunk identities (tuana_chunk0..4) and binds to dataset hash.
++- Rigorously validates corrected manifest record count, complete coverage, and row labels.
++- Enforces >=2 distinct real users per target class; rejects custom classes with single user.
++- Asserts zero user leakage AND zero session leakage per fold.
++- Asserts each evaluated source row appears exactly once as test sample.
++- Reports fold classes absent from train if any.
++- Exports split fingerprint, evaluator source hash, and detailed predictions.
++- Explicitly declares custom 3-class unseen-user metrics as UNAVAILABLE; never claims 9-class improvement.
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import os
++import sys
++from typing import Any, Dict, List, Optional
++
++import numpy as np
++
++# Ensure workspace root is in sys.path
++WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
++if WORKSPACE_ROOT not in sys.path:
++    sys.path.insert(0, WORKSPACE_ROOT)
++
++from src.gesture.pose import HandPose
++from src.ml.evaluation import compute_metrics, group_kfold_split
++from src.ml.svm import SVMClassifier
++from tools.collect_data import load_dataset_npz
++from tools.train import extract_groups, validate_dataset
++
++# Known baseline dataset hashes
++DATASET_HASHES = {
++    "custom": "498699e1f28a78031193476fbafff2a2cd307bb9d82a8baee6a57f3097019169",
++    "hagrid": "ec38045d608aa6d30386796e4e0586ff619468d4abfd755619835bb8fa61c081",
++    "combined": "c0c6d4e26c26f8a303077c6de971a54c2d4085444f9479cef9e021986cc9e8bf",
++}
++
++
++def compute_file_sha256(filepath: str) -> str:
++    """Compute hex SHA-256 digest of a file."""
++    h = hashlib.sha256()
++    with open(filepath, "rb") as f:
++        while chunk := f.read(1024 * 1024):
++            h.update(chunk)
++    return h.hexdigest()
++
++
++def compute_split_fingerprint(fold_test_source_ids: List[List[int]]) -> str:
++    """Compute deterministic SHA-256 fingerprint of fold test splits."""
++    payload = json.dumps(fold_test_source_ids, separators=(",", ":"))
++    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
++
++
++def apply_and_validate_corrected_manifest(
++    metadata: List[Dict[str, Any]],
++    labels: List[str] | np.ndarray,
++    manifest_path: str,
++    dataset_hash: str,
++) -> Tuple[str, Dict[str, Any]]:
++    """Validate and apply corrected provenance manifest.
++
++    Validates:
++    - manifest combined_hash matches dataset_hash
++    - exact record count matches dataset length
++    - unique and complete sample_id coverage [0..N-1]
++    - row label mapping matches dataset labels exactly
++    """
++    if not os.path.exists(manifest_path):
++        raise FileNotFoundError(f"Corrected group manifest not found: {manifest_path}")
++
++    with open(manifest_path, "r", encoding="utf-8") as f:
++        manifest_json = json.load(f)
++
++    manifest_meta = manifest_json.get("metadata", {})
++    if manifest_meta.get("combined_hash") != dataset_hash:
++        raise ValueError(
++            f"Corrected manifest hash mismatch: manifest bound to {manifest_meta.get('combined_hash')}, "
++            f"dataset has {dataset_hash}"
++        )
++
++    records = manifest_json.get("records", [])
++    n_expected = len(labels)
++    if len(records) != n_expected:
++        raise ValueError(
++            f"Manifest record count mismatch: expected {n_expected} records, found {len(records)}"
++        )
++
++    # Validate unique complete sample_id coverage and row label matching
++    seen_ids = set()
++    for rec in records:
++        sid = rec.get("sample_id")
++        if sid is None or not isinstance(sid, int):
++            raise ValueError(f"Invalid sample_id {sid!r} in manifest record: {rec}")
++        if sid in seen_ids or sid < 0 or sid >= n_expected:
++            raise ValueError(f"Duplicate or out-of-range sample_id {sid} in manifest")
++        seen_ids.add(sid)
++
++        # Check label matching
++        expected_lbl = str(labels[sid])
++        rec_lbl = str(rec.get("label"))
++        if rec_lbl != expected_lbl:
++            raise ValueError(
++                f"Label mismatch in manifest at sample {sid}: expected '{expected_lbl}', got '{rec_lbl}'"
++            )
++
++    if seen_ids != set(range(n_expected)):
++        raise ValueError("Manifest does not provide complete 0..N-1 sample_id coverage")
++
++    # Apply true groups by sample_id mapping (not blind enumeration)
++    for rec in records:
++        sid = rec["sample_id"]
++        metadata[sid]["user_id"] = rec["true_user_id"]
++        metadata[sid]["session_id"] = rec["true_session_id"]
++
++    manifest_hash = compute_file_sha256(manifest_path)
++    return manifest_hash, manifest_meta
++
++
++def run_evaluation(
++    dataset_path: str = "data/hagrid_airpad.npz",
++    group_key: str = "user_id",
++    n_splits: int = 5,
++    seed: int = 42,
++    sample_limit: Optional[int] = None,
++    C: float = 10.0,
++    gamma: float | str = 0.01,
++    class_weight: Optional[str] = "balanced",
++    decision_threshold: float = 0.0,
++    margin_threshold: float = 0.15,
++    output_dir: str = "reports/acc01/smoke",
++    split_manifest_name: str = "split_manifest.json",
++    predictions_name: str = "predictions.jsonl",
++    metrics_name: str = "clean_baseline_metrics.json",
++    corrected_manifest_path: Optional[str] = "reports/acc01/corrected_group_manifest.json",
++    scaler_spy: Optional[List[Dict[str, Any]]] = None,
++) -> Dict[str, Any]:
++    """Execute clean baseline evaluation with strict zero-leakage protocol."""
++    os.makedirs(output_dir, exist_ok=True)
++    dataset_hash = compute_file_sha256(dataset_path)
++    evaluator_source_hash = compute_file_sha256(__file__)
++
++    # 1. Load and validate dataset
++    features, labels, metadata = load_dataset_npz(dataset_path)
++    validate_dataset(features, labels, metadata, raise_on_error=True)
++    n_total_source_rows = len(labels)
++
++    # Check for known synthetic chunk leakage
++    raw_user_ids = [m.get("user_id", "") for m in metadata]
++    has_synthetic_chunks = any(
++        isinstance(u, str) and u.startswith("tuana_chunk") for u in raw_user_ids
++    )
++
++    manifest_hash = None
++    if has_synthetic_chunks:
++        if not corrected_manifest_path:
++            raise ValueError(
++                "Dataset contains synthetic chunk groupings ('tuana_chunk*') which cause 100% fold leakage! "
++                "Leaky CV evaluation is strictly rejected. Provide a valid corrected group manifest."
++            )
++        manifest_hash, _ = apply_and_validate_corrected_manifest(
++            metadata=metadata,
++            labels=labels,
++            manifest_path=corrected_manifest_path,
++            dataset_hash=dataset_hash,
++        )
++        print(f"[INFO] Successfully applied and validated corrected manifest (hash: {manifest_hash[:16]}...)")
++
++    # 2. Filter trainable classes and track exact source row IDs
++    trainable_source_indices: List[int] = []
++    for idx, lbl in enumerate(labels):
++        lbl_str = str(lbl)
++        if lbl_str not in {"NO_HAND", "UNKNOWN", str(int(HandPose.NO_HAND)), str(int(HandPose.UNKNOWN))}:
++            trainable_source_indices.append(idx)
++
++    # Apply deterministic stratified sample limit if provided (for smoke testing)
++    if sample_limit is not None and sample_limit < len(trainable_source_indices):
++        trainable_labels = [str(labels[i]) for i in trainable_source_indices]
++        unique_cls = sorted(list(set(trainable_labels)))
++        per_class_limit = max(2, sample_limit // len(unique_cls))
++        selected_source_indices = []
++        for cls in unique_cls:
++            cls_source_idxs = [
++                src_i for src_i, l in zip(trainable_source_indices, trainable_labels) if l == cls
++            ]
++            selected_source_indices.extend(cls_source_idxs[:per_class_limit])
++        selected_source_indices = sorted(selected_source_indices)
++        print(
++            f"[INFO] Applying deterministic stratified sample limit: {len(selected_source_indices)} / "
++            f"{len(trainable_source_indices)} samples ({per_class_limit} per class)"
++        )
++    else:
++        selected_source_indices = trainable_source_indices
++
++    # Extract evaluated subset with exact source tracking
++    X = features[selected_source_indices]
++    y = np.array([str(labels[i]) for i in selected_source_indices])
++    meta = [metadata[i] for i in selected_source_indices]
++    n_evaluated_samples = len(X)
++
++    target_classes = sorted(list(set(y)))
++    print(
++        f"Evaluating {n_evaluated_samples} samples across {len(target_classes)} classes: {target_classes}"
++    )
++
++    # 3. Extract and validate groups
++    groups = extract_groups(meta, group_key=group_key)
++    sessions = extract_groups(meta, group_key="session_id")
++    users = extract_groups(meta, group_key="user_id")
++    unique_groups = np.unique(groups)
++    print(f"Groups: {len(unique_groups)} unique groups by '{group_key}'")
++    # Validate independent user support per target class (>= 2 real users per class required)
++    for cls in target_classes:
++        cls_mask = (y == cls)
++        cls_users = np.unique(users[cls_mask])
++        if len(cls_users) < 2:
++            raise ValueError(
++                f"Target class '{cls}' lacks independent user support: found only {len(cls_users)} real user(s) "
++                f"({cls_users.tolist()}). Clean grouped cross-validation requires at least 2 distinct real users per class. "
++                f"Evaluation for this class is strictly UNAVAILABLE; clean 9-class evaluation is blocked."
++            )
++
++    if len(unique_groups) < n_splits:
++        raise ValueError(
++            f"Insufficient unique groups ({len(unique_groups)}) for n_splits={n_splits}. "
++            f"Grouped CV requires at least {n_splits} groups."
++        )
++
++    # 4. Generate folds with strict user AND session disjointness
++    fold_splits = list(group_kfold_split(X, y, groups, n_splits=n_splits, seed=seed))
++    fold_test_source_ids: List[List[int]] = []
++    all_tested_source_ids: List[int] = []
++
++    split_manifest_folds = []
++    for fold_idx, (tr_idx, te_idx) in enumerate(fold_splits):
++        tr_source_ids = [selected_source_indices[i] for i in tr_idx]
++        te_source_ids = [selected_source_indices[i] for i in te_idx]
++        fold_test_source_ids.append(te_source_ids)
++        all_tested_source_ids.extend(te_source_ids)
++
++        # Assertion: zero user leakage
++        tr_users = set(users[tr_idx])
++        te_users = set(users[te_idx])
++        user_overlap = tr_users.intersection(te_users)
++        if len(user_overlap) > 0:
++            raise RuntimeError(f"User leakage detected in fold {fold_idx}: {user_overlap}")
++
++        # Assertion: zero real-session leakage
++        tr_sessions = set(sessions[tr_idx])
++        te_sessions = set(sessions[te_idx])
++        session_overlap = tr_sessions.intersection(te_sessions)
++        if len(session_overlap) > 0:
++            raise RuntimeError(f"Session leakage detected in fold {fold_idx}: {session_overlap}")
++
++        # Compute per-class support and assert no absent training classes
++        tr_labels = y[tr_idx]
++        te_labels = y[te_idx]
++        tr_supp = {cls: int(np.sum(tr_labels == cls)) for cls in target_classes}
++        te_supp = {cls: int(np.sum(te_labels == cls)) for cls in target_classes}
++
++        for cls in target_classes:
++            if tr_supp[cls] == 0:
++                raise ValueError(
++                    f"Fold {fold_idx} has absent training class: '{cls}' has 0 training samples."
++                )
++
++        split_manifest_folds.append({
++            "fold_idx": fold_idx,
++            "train_samples": len(tr_idx),
++            "test_samples": len(te_idx),
++            "train_users": len(tr_users),
++            "test_users": len(te_users),
++            "train_sessions": len(tr_sessions),
++            "test_sessions": len(te_sessions),
++            "user_leakage_count": 0,
++            "session_leakage_count": 0,
++            "train_support": tr_supp,
++            "test_support": te_supp,
++            "train_source_row_ids": tr_source_ids,
++            "test_source_row_ids": te_source_ids,
++        })
++
++    # Assertion: each evaluated source row appears EXACTLY ONCE as a test sample
++    assert len(all_tested_source_ids) == len(selected_source_indices), (
++        f"Mismatch in test sample count: {len(all_tested_source_ids)} vs {len(selected_source_indices)}"
++    )
++    assert sorted(all_tested_source_ids) == sorted(selected_source_indices), (
++        "Every evaluated source row must appear exactly once in the test set across all folds!"
++    )
++
++    split_fingerprint = compute_split_fingerprint(fold_test_source_ids)
++
++    split_manifest = {
++        "dataset_path": dataset_path,
++        "dataset_hash": dataset_hash,
++        "evaluator_source_hash": evaluator_source_hash,
++        "manifest_hash": manifest_hash,
++        "split_fingerprint": split_fingerprint,
++        "group_key": group_key,
++        "n_splits": n_splits,
++        "seed": seed,
++        "sample_limit": sample_limit,
++        "n_total_source_rows": n_total_source_rows,
++        "n_evaluated_samples": n_evaluated_samples,
++        "selected_source_indices": selected_source_indices,
++        "target_classes": target_classes,
++        "folds": split_manifest_folds,
++    }
++
++    split_manifest_path = os.path.join(output_dir, split_manifest_name)
++    with open(split_manifest_path, "w", encoding="utf-8") as f:
++        json.dump(split_manifest, f, indent=2)
++    print(f"Split manifest saved to: {split_manifest_path} (Fingerprint: {split_fingerprint[:16]}...)")
++
++    # 5. Run grouped CV evaluation
++    all_true: List[str] = []
++    all_pred_raw: List[str] = []
++    all_pred_rejected: List[str] = []
++    prediction_records: List[Dict[str, Any]] = []
++
++    per_fold_metrics_clean: List[Dict[str, Any]] = []
++    per_fold_metrics_raw: List[Dict[str, Any]] = []
++
++    for fold_idx, (tr_idx, te_idx) in enumerate(fold_splits):
++        print(f"Running Fold {fold_idx + 1}/{n_splits} (train: {len(tr_idx)}, test: {len(te_idx)})...")
++        X_tr, y_tr = X[tr_idx], y[tr_idx]
++        X_te, y_te = X[te_idx], y[te_idx]
++        te_source_ids = [selected_source_indices[i] for i in te_idx]
++
++        # Fit SVMClassifier: StandardScaler is strictly fit on X_tr only
++        clf = SVMClassifier(
++            C=C,
++            gamma=gamma,
++            class_weight=class_weight,
++        ).fit(X_tr, y_tr)
++
++        # Scaler spy hook for tests
++        if scaler_spy is not None:
++            scaler_spy.append({
++                "fold": fold_idx,
++                "scaler_mean": clf.scaler.mean_.copy(),
++                "scaler_scale": clf.scaler.scale_.copy(),
++                "train_mean": X_tr.mean(axis=0),
++                "train_std": X_tr.std(axis=0),
++                "test_mean": X_te.mean(axis=0),
++            })
++
++        # Raw predictions
++        y_pred_raw = clf.predict(X_te)
++        # Predictions with rejection
++        y_pred_rej = clf.predict_with_rejection(
++            X_te,
++            decision_threshold=decision_threshold,
++            margin_threshold=margin_threshold,
++            unknown_label="UNKNOWN",
++        )
++
++        # Compute fold metrics
++        m_raw = compute_metrics(y_te, y_pred_raw, labels=target_classes)
++        m_rej = compute_metrics(y_te, y_pred_rej, labels=target_classes)
++        per_fold_metrics_raw.append(m_raw)
++        per_fold_metrics_clean.append(m_rej)
++
++        for i, idx in enumerate(te_idx):
++            src_row_id = selected_source_indices[idx]
++            record = {
++                "source_row_id": int(src_row_id),
++                "sample_id": int(src_row_id),
++                "fold": fold_idx,
++                "user_id": str(meta[idx].get("user_id")),
++                "session_id": str(meta[idx].get("session_id")),
++                "true_label": str(y_te[i]),
++                "pred_raw": str(y_pred_raw[i]),
++                "pred_rejected": str(y_pred_rej[i]),
++                "is_rejected": bool(y_pred_rej[i] == "UNKNOWN"),
++            }
++            prediction_records.append(record)
++            all_true.append(str(y_te[i]))
++            all_pred_raw.append(str(y_pred_raw[i]))
++            all_pred_rejected.append(str(y_pred_rej[i]))
++
++    # 6. Export prediction records
++    pred_path = os.path.join(output_dir, predictions_name)
++    with open(pred_path, "w", encoding="utf-8") as f:
++        for rec in prediction_records:
++            f.write(json.dumps(rec) + "\n")
++    print(f"Prediction records saved to: {pred_path} ({len(prediction_records)} records)")
++
++    # 7. Compute overall out-of-fold metrics
++    oof_metrics_raw = compute_metrics(all_true, all_pred_raw, labels=target_classes)
++    oof_metrics_clean = compute_metrics(all_true, all_pred_rejected, labels=target_classes)
++
++    overall_results = {
++        "evaluation_name": "ACC-01 Clean Six-Class HaGRID Baseline Evaluation",
++        "dataset_path": dataset_path,
++        "dataset_hash": dataset_hash,
++        "evaluator_source_hash": evaluator_source_hash,
++        "manifest_hash": manifest_hash,
++        "split_fingerprint": split_fingerprint,
++        "sample_limit": sample_limit,
++        "n_total_source_rows": n_total_source_rows,
++        "n_evaluated_samples": n_evaluated_samples,
++        "target_classes": target_classes,
++        "group_key": group_key,
++        "n_splits": n_splits,
++        "seed": seed,
++        "hyperparameters": {
++            "C": C,
++            "gamma": gamma,
++            "class_weight": class_weight,
++            "decision_threshold": decision_threshold,
++            "margin_threshold": margin_threshold,
++        },
++        "custom_classes_unseen_user_status": {
++            "status": "UNAVAILABLE",
++            "reason": (
++                "Only 1 real user ('tuana') and 1 real session ('sess_20260929_132034_7a13ed') "
++                "exist for PINCH_CLOSED, PINCH_MIDDLE, and L_SHAPE. "
++                "Clean unseen-user generalization metrics are strictly unavailable without additional user data. "
++                "This benchmark evaluates the 6 HaGRID classes only; 9-class clean performance cannot be claimed."
++            ),
++            "affected_classes": ["PINCH_CLOSED", "PINCH_MIDDLE", "L_SHAPE"],
++        },
++        "clean_baseline_post_rejection": {
++            "macro_f1": oof_metrics_clean["macro_f1"],
++            "accuracy": oof_metrics_clean["accuracy"],
++            "balanced_accuracy": oof_metrics_clean["balanced_accuracy"],
++            "support": oof_metrics_clean["support"],
++            "coverage": oof_metrics_clean["coverage"],
++            "rejection_rate": oof_metrics_clean["rejection_rate"],
++            "per_class": oof_metrics_clean["per_class"],
++            "confusion_matrix": oof_metrics_clean["confusion_matrix"],
++            "confusion_row_labels": oof_metrics_clean["confusion_row_labels"],
++            "confusion_col_labels": oof_metrics_clean["confusion_col_labels"],
++        },
++        "raw_baseline_pre_rejection": {
++            "macro_f1": oof_metrics_raw["macro_f1"],
++            "accuracy": oof_metrics_raw["accuracy"],
++            "balanced_accuracy": oof_metrics_raw["balanced_accuracy"],
++            "support": oof_metrics_raw["support"],
++            "per_class": oof_metrics_raw["per_class"],
++            "confusion_matrix": oof_metrics_raw["confusion_matrix"],
++        },
++        "per_fold_summary": [
++            {
++                "fold": idx,
++                "clean_macro_f1": per_fold_metrics_clean[idx]["macro_f1"],
++                "clean_accuracy": per_fold_metrics_clean[idx]["accuracy"],
++                "raw_macro_f1": per_fold_metrics_raw[idx]["macro_f1"],
++                "raw_accuracy": per_fold_metrics_raw[idx]["accuracy"],
++                "rejection_rate": per_fold_metrics_clean[idx]["rejection_rate"],
++                "user_leakage": 0,
++                "session_leakage": 0,
++            }
++            for idx in range(n_splits)
++        ],
++        "historical_comparison_notes": {
++            "historical_macro_f1": 0.967276,
++            "historical_is_leaky": True,
++            "historical_reason": "Evaluated on synthetic chunks (tuana_chunk0..4) with 100% user/session leakage.",
++            "direct_comparison_valid": False,
++            "note": "Clean six-class baseline score must not be directly compared to leaky nine-class historical score.",
++        },
++    }
++
++    metrics_path = os.path.join(output_dir, metrics_name)
++    with open(metrics_path, "w", encoding="utf-8") as f:
++        json.dump(overall_results, f, indent=2)
++    print(f"Metrics report saved to: {metrics_path}")
++
++    # 8. Print summary report
++    print("\n" + "=" * 70)
++    print("           ACC-01 CLEAN SIX-CLASS BASELINE REPORT")
++    print("=" * 70)
++    print(f"Dataset:            {dataset_path}")
++    print(f"Evaluator Hash:     {evaluator_source_hash[:16]}...")
++    print(f"Samples Evaluated:  {n_evaluated_samples} ({len(target_classes)} classes)")
++    print(f"Grouping:           {group_key} ({len(unique_groups)} groups, {n_splits} folds)")
++    print(f"Split Fingerprint:  {split_fingerprint}")
++    print(f"Parameters:         C={C}, gamma={gamma}, margin_threshold={margin_threshold}")
++    print("-" * 70)
++    print(f"CLEAN Macro-F1 (post-rejection):    {oof_metrics_clean['macro_f1']:.16f}")
++    print(f"CLEAN Accuracy (post-rejection):    {oof_metrics_clean['accuracy']:.16f}")
++    print(f"Balanced Accuracy:                 {oof_metrics_clean['balanced_accuracy']:.16f}")
++    print(f"Coverage:                          {oof_metrics_clean['coverage']:.4f} ({oof_metrics_clean['rejection_rate']*100:.2f}% rejected)")
++    print(f"Raw Macro-F1 (pre-rejection):      {oof_metrics_raw['macro_f1']:.16f}")
++    print("-" * 70)
++    print(f"{'Class':<20} {'Precision':<12} {'Recall':<12} {'F1-Score':<12} {'Support':<10}")
++    print("-" * 70)
++    for cls in target_classes:
++        pc = oof_metrics_clean["per_class"][cls]
++        print(f"{cls:<20} {pc['precision']:<12.4f} {pc['recall']:<12.4f} {pc['f1']:<12.4f} {pc['support']:<10}")
++    print("=" * 70 + "\n")
++
++    return overall_results
++
++
++def main(argv: List[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description="Clean fixed-seed evaluation CLI for AirPad baseline.")
++    parser.add_argument("--dataset", default="data/hagrid_airpad.npz", help="Path to input .npz dataset")
++    parser.add_argument("--group-key", default="user_id", help="Group key for cross-validation")
++    parser.add_argument("--n-splits", type=int, default=5, help="Number of folds")
++    parser.add_argument("--seed", type=int, default=42, help="Random seed for splitting")
++    parser.add_argument("--sample-limit", type=int, default=None, help="Deterministic sample limit for smoke benchmark")
++    parser.add_argument("--c", type=float, default=10.0, help="SVC C parameter")
++    parser.add_argument("--gamma", default="0.01", help="SVC gamma parameter")
++    parser.add_argument("--class-weight", default="balanced", help="SVC class_weight")
++    parser.add_argument("--decision-threshold", type=float, default=0.0, help="Rejection decision threshold")
++    parser.add_argument("--margin-threshold", type=float, default=0.15, help="Rejection margin threshold")
++    parser.add_argument("--output-dir", default="reports/acc01/smoke", help="Output directory")
++    parser.add_argument("--split-manifest-name", default="split_manifest.json", help="Split manifest filename")
++    parser.add_argument("--predictions-name", default="predictions.jsonl", help="Predictions filename")
++    parser.add_argument("--metrics-name", default="clean_baseline_metrics.json", help="Metrics report filename")
++    parser.add_argument("--corrected-manifest", default="reports/acc01/corrected_group_manifest.json", help="Path to corrected group manifest")
++
++    args = parser.parse_args(argv)
++
++    try:
++        gamma_val: float | str
++        try:
++            gamma_val = float(args.gamma)
++        except ValueError:
++            gamma_val = str(args.gamma)
++
++        run_evaluation(
++            dataset_path=args.dataset,
++            group_key=args.group_key,
++            n_splits=args.n_splits,
++            seed=args.seed,
++            sample_limit=args.sample_limit,
++            C=args.c,
++            gamma=gamma_val,
++            class_weight=args.class_weight,
++            decision_threshold=args.decision_threshold,
++            margin_threshold=args.margin_threshold,
++            output_dir=args.output_dir,
++            split_manifest_name=args.split_manifest_name,
++            predictions_name=args.predictions_name,
++            metrics_name=args.metrics_name,
++            corrected_manifest_path=args.corrected_manifest,
++        )
++        return 0
++    except Exception as e:
++        print(f"\n[ERROR] Evaluation failed: {e}\n", file=sys.stderr)
++        return 1
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+--- /dev/null
++++ b/tests/test_evaluation.py
+@@ -0,0 +1,373 @@
++"""Regression tests for ACC-01 evaluation fixes and provenance audit.
++
++Tests verify:
++- UNKNOWN prediction handled as false negative / rejection (0.5 recall, 2/3 F1, support=2).
++- Rejection column in confusion matrix without adding an extra macro target class.
++- Rejection of unexpected ground truth and predicted labels.
++- Rejection of missing, empty, or insufficient groups in extract_groups and group_kfold_split.
++- Strict zero-leakage fold isolation.
++- Both user and session leakage detection for combined vs true custom data.
++- Exact 1-to-1 provenance reconstruction between combined, HaGRID, and custom datasets.
++- Scaler is fit exclusively on train fold with zero test leakage.
++- Deterministic split manifest and reproducible prediction outputs.
++"""
++from __future__ import annotations
++
++import json
++import os
++import tempfile
++import numpy as np
++import pytest
++
++from src.gesture.pose import HandPose
++from src.ml.evaluation import compute_metrics, group_kfold_split, leave_one_subject_out
++from src.ml.svm import SVMClassifier
++from tools.audit.provenance import audit_datasets
++from tools.collect_data import load_dataset_npz
++from tools.train import extract_groups, evaluate_fold
++
++
++class TestUnknownRejectionMetrics:
++    def test_unknown_exact_regression_spec(self):
++        """Exact regression test from task specification:
++        compute_metrics([POINT_ONE, POINT_ONE], [POINT_ONE, UNKNOWN], labels=[POINT_ONE])
++        must return recall=0.5, F1=2/3, support=2.
++        """
++        # Test with string labels
++        res_str = compute_metrics(
++            ["POINT_ONE", "POINT_ONE"],
++            ["POINT_ONE", "UNKNOWN"],
++            labels=["POINT_ONE"],
++        )
++        assert res_str["macro_f1"] == pytest.approx(2 / 3, abs=1e-6)
++        assert res_str["accuracy"] == 0.5
++        assert res_str["balanced_accuracy"] == 0.5
++        assert res_str["support"] == 2
++        assert res_str["coverage"] == 0.5
++        assert res_str["rejection_rate"] == 0.5
++
++        pc = res_str["per_class"]["POINT_ONE"]
++        assert pc["precision"] == 1.0
++        assert pc["recall"] == 0.5
++        assert pc["f1"] == pytest.approx(2 / 3, abs=1e-6)
++        assert pc["support"] == 2
++
++        # Confusion matrix has shape (1, 2) with UNKNOWN column
++        assert res_str["confusion_matrix"] == [[1, 1]]
++        assert res_str["confusion_col_labels"] == ["POINT_ONE", "UNKNOWN"]
++        assert res_str["confusion_row_labels"] == ["POINT_ONE"]
++
++        # Test with HandPose enum
++        res_enum = compute_metrics(
++            [HandPose.POINT_ONE, HandPose.POINT_ONE],
++            [HandPose.POINT_ONE, HandPose.UNKNOWN],
++            labels=[HandPose.POINT_ONE],
++        )
++        assert res_enum["macro_f1"] == pytest.approx(2 / 3, abs=1e-6)
++        pc_enum = res_enum["per_class"][HandPose.POINT_ONE]
++        assert pc_enum["recall"] == 0.5
++        assert pc_enum["f1"] == pytest.approx(2 / 3, abs=1e-6)
++        assert pc_enum["support"] == 2
++
++    def test_unknown_does_not_add_extra_macro_target_class(self):
++        """UNKNOWN must NOT be counted as an extra class in macro_f1."""
++        y_true = ["A", "B"]
++        y_pred = ["A", "UNKNOWN"]
++        res = compute_metrics(y_true, y_pred, labels=["A", "B"])
++
++        # Target classes must only be A and B
++        assert set(res["per_class"].keys()) == {"A", "B"}
++        # A: precision=1, recall=1, f1=1
++        # B: precision=0, recall=0, f1=0 (rejected as UNKNOWN)
++        # Macro-F1 = (1.0 + 0.0) / 2 = 0.5
++        assert res["macro_f1"] == 0.5
++        assert res["confusion_matrix"] == [[1, 0, 0], [0, 0, 1]]
++        assert res["confusion_col_labels"] == ["A", "B", "UNKNOWN"]
++
++    def test_unexpected_labels_fail_clearly(self):
++        """Unexpected labels must raise ValueError."""
++        # Unexpected prediction
++        with pytest.raises(ValueError, match="Unexpected prediction label"):
++            compute_metrics(["A", "B"], ["A", "UNEXPECTED_LABEL"], labels=["A", "B"])
++
++        # Unexpected ground truth
++        with pytest.raises(ValueError, match="Unexpected ground truth label"):
++            compute_metrics(["A", "INVALID_TRUE"], ["A", "B"], labels=["A", "B"])
++
++
++class TestGroupExtractionAndSplitting:
++    def test_extract_groups_rejects_missing_key(self):
++        """extract_groups must fail clearly when group_key is missing."""
++        bad_metadata = [
++            {"session_id": "s1", "user_id": "u1"},
++            {"session_id": "s2"},  # missing user_id
++        ]
++        with pytest.raises(ValueError, match="missing required group_key 'user_id'"):
++            extract_groups(bad_metadata, group_key="user_id")
++
++    def test_extract_groups_rejects_empty_or_none_value(self):
++        """extract_groups must fail clearly when group value is None, empty string, or NaN."""
++        bad_metadata_none = [{"user_id": None}]
++        with pytest.raises(ValueError, match="empty or invalid group_key"):
++            extract_groups(bad_metadata_none, group_key="user_id")
++
++        bad_metadata_empty = [{"user_id": "   "}]
++        with pytest.raises(ValueError, match="empty or invalid group_key"):
++            extract_groups(bad_metadata_empty, group_key="user_id")
++
++        bad_metadata_nan = [{"user_id": float("nan")}]
++        with pytest.raises(ValueError, match="empty or invalid group_key"):
++            extract_groups(bad_metadata_nan, group_key="user_id")
++
++    def test_group_kfold_split_rejects_insufficient_groups(self):
++        """group_kfold_split must fail clearly when unique groups < n_splits."""
++        X = np.ones((10, 2))
++        y = np.zeros(10)
++        groups = np.array(["g1", "g1", "g2", "g2", "g1", "g2", "g1", "g2", "g1", "g2"])  # only 2 groups
++
++        with pytest.raises(ValueError, match="Insufficient group count"):
++            list(group_kfold_split(X, y, groups, n_splits=5))
++
++    def test_group_kfold_split_rejects_missing_or_empty_groups(self):
++        """group_kfold_split must fail clearly if any group is None, empty, or NaN."""
++        X = np.ones((4, 2))
++        y = np.zeros(4)
++
++        with pytest.raises(ValueError, match="None"):
++            list(group_kfold_split(X, y, np.array(["g1", None, "g2", "g3"]), n_splits=2))
++
++        with pytest.raises(ValueError, match="empty or whitespace"):
++            list(group_kfold_split(X, y, np.array(["g1", "", "g2", "g3"]), n_splits=2))
++
++    def test_real_group_split_isolation_zero_leakage(self):
++        """True grouped folds must guarantee zero group leakage between train and test."""
++        rng = np.random.RandomState(42)
++        n_samples = 200
++        X = rng.randn(n_samples, 10)
++        y = rng.choice(["A", "B", "C"], size=n_samples)
++        groups = np.array([f"user_{i % 20}" for i in range(n_samples)])
++
++        for train_idx, test_idx in group_kfold_split(X, y, groups, n_splits=5, seed=42):
++            tr_g = set(groups[train_idx])
++            te_g = set(groups[test_idx])
++            assert tr_g.isdisjoint(te_g), f"Leaked groups: {tr_g.intersection(te_g)}"
++            assert len(train_idx) + len(test_idx) == n_samples
++
++
++class TestProvenanceAndLeakage:
++    def test_exact_provenance_reconstruction(self):
++        """Combined dataset rows must match HaGRID and Custom datasets 1-to-1 exactly."""
++        h_feat, h_lbl, h_meta = load_dataset_npz("data/hagrid_airpad.npz")
++        c_feat, c_lbl, c_meta = load_dataset_npz("data/custom_airpad.npz")
++        comb_feat, comb_lbl, comb_meta = load_dataset_npz("data/combined_airpad.npz")
++
++        n_h = len(h_lbl)
++        n_c = len(c_lbl)
++        assert len(comb_lbl) == n_h + n_c
++
++        # HaGRID segment exact match
++        assert np.array_equal(comb_feat[:n_h], h_feat)
++        assert np.array_equal(comb_lbl[:n_h], h_lbl)
++
++        # Custom segment exact match
++        assert np.array_equal(comb_feat[n_h:], c_feat)
++        assert np.array_equal(comb_lbl[n_h:], c_lbl)
++
++        # Custom rows have true user 'tuana' and true session
++        true_users = {m["user_id"] for m in c_meta}
++        assert true_users == {"tuana"}
++        true_sessions = {m["session_id"] for m in c_meta}
++        assert len(true_sessions) == 1
++
++    def test_synthetic_chunks_leak_user_and_session(self):
++        """Demonstrate that synthetic chunks in combined_airpad.npz leak real user and session.
++
++        When splitting the 1066 custom samples using the synthetic chunk identities (tuana_chunk0..4),
++        every single fold leaks the real user ('tuana') and the real session ('sess_20260929_132034_7a13ed').
++        """
++        _, _, c_meta = load_dataset_npz("data/custom_airpad.npz")
++        _, _, comb_meta = load_dataset_npz("data/combined_airpad.npz")
++        custom_comb_meta = comb_meta[60000:]
++
++        synthetic_users = np.array([m["user_id"] for m in custom_comb_meta])
++        true_users = np.array([m["user_id"] for m in c_meta])
++        true_sessions = np.array([m["session_id"] for m in c_meta])
++
++        assert set(synthetic_users) == {f"tuana_chunk{i}" for i in range(5)}
++        assert set(true_users) == {"tuana"}
++
++        # Simulate 5-fold CV using the synthetic chunk IDs
++        X_dummy = np.zeros((len(synthetic_users), 2))
++        y_dummy = np.zeros(len(synthetic_users))
++
++        leaked_folds_user = 0
++        leaked_folds_session = 0
++
++        for tr_idx, te_idx in group_kfold_split(X_dummy, y_dummy, synthetic_users, n_splits=5, seed=42):
++            # Synthetic users appear disjoint:
++            assert set(synthetic_users[tr_idx]).isdisjoint(set(synthetic_users[te_idx]))
++
++            # BUT true user leaks completely:
++            tr_true_users = set(true_users[tr_idx])
++            te_true_users = set(true_users[te_idx])
++            if not tr_true_users.isdisjoint(te_true_users):
++                leaked_folds_user += 1
++
++            # AND true session leaks completely:
++            tr_true_sessions = set(true_sessions[tr_idx])
++            te_true_sessions = set(true_sessions[te_idx])
++            if not tr_true_sessions.isdisjoint(te_true_sessions):
++                leaked_folds_session += 1
++
++        assert leaked_folds_user == 5, "All 5 folds must exhibit true user leakage under synthetic chunks!"
++        assert leaked_folds_session == 5, "All 5 folds must exhibit true session leakage under synthetic chunks!"
++
++    def test_custom_classes_have_insufficient_users_for_cv(self):
++        """Under true user groups, 1 user cannot be partitioned into 5 folds."""
++        c_feat, c_lbl, c_meta = load_dataset_npz("data/custom_airpad.npz")
++        true_users = np.array([m["user_id"] for m in c_meta])
++        assert len(np.unique(true_users)) == 1
++
++        with pytest.raises(ValueError, match="Insufficient group count"):
++            list(group_kfold_split(c_feat, c_lbl, true_users, n_splits=5))
++
++
++class TestScalerAndReproducibility:
++    def test_scaler_fit_exclusively_on_train_evaluator_spy(self, tmp_path):
++        """Verify scaler is fit exclusively on train fold through actual evaluator fit path."""
++        from tools.evaluate import run_evaluation
++        spy: list[dict] = []
++        run_evaluation(
++            dataset_path="data/hagrid_airpad.npz",
++            sample_limit=300,
++            output_dir=str(tmp_path),
++            scaler_spy=spy,
++        )
++        assert len(spy) == 5, "Must capture scaler state across all 5 folds"
++        for fold_info in spy:
++            assert np.allclose(fold_info["scaler_mean"], fold_info["train_mean"], atol=1e-6), (
++                f"Fold {fold_info['fold']} scaler mean does not match training fold mean"
++            )
++            # Scaler mean must NOT match test fold mean
++            assert not np.allclose(fold_info["scaler_mean"], fold_info["test_mean"]), (
++                f"Fold {fold_info['fold']} scaler mean leaked test fold data"
++            )
++            # Positive variance features match train std
++            pos_var = fold_info["train_std"] > 1e-5
++            assert np.allclose(fold_info["scaler_scale"][pos_var], fold_info["train_std"][pos_var], atol=1e-5), (
++                f"Fold {fold_info['fold']} scaler scale does not match training fold std on varying features"
++            )
++
++    def test_deterministic_split_and_predictions(self, tmp_path):
++        """Running evaluation with fixed seed must generate identical folds and predictions."""
++        from tools.evaluate import run_evaluation
++
++        out1 = str(tmp_path / "run1")
++        out2 = str(tmp_path / "run2")
++
++        res1 = run_evaluation(
++            dataset_path="data/hagrid_airpad.npz",
++            sample_limit=300,
++            seed=42,
++            output_dir=out1,
++        )
++        res2 = run_evaluation(
++            dataset_path="data/hagrid_airpad.npz",
++            sample_limit=300,
++            seed=42,
++            output_dir=out2,
++        )
++
++        assert res1["clean_baseline_post_rejection"]["macro_f1"] == res2["clean_baseline_post_rejection"]["macro_f1"]
++        assert res1["clean_baseline_post_rejection"]["accuracy"] == res2["clean_baseline_post_rejection"]["accuracy"]
++
++        # Compare predictions files
++        preds1 = open(os.path.join(out1, "predictions.jsonl")).read()
++        preds2 = open(os.path.join(out2, "predictions.jsonl")).read()
++        assert preds1 == preds2
++
++    def test_synthetic_chunk_rejection_without_manifest(self):
++        """Passing combined dataset with synthetic chunks must fail if no corrected manifest."""
++        from tools.evaluate import run_evaluation
++
++        with pytest.raises(ValueError, match="synthetic chunk groupings"):
++            run_evaluation(
++                dataset_path="data/combined_airpad.npz",
++                corrected_manifest_path=None,
++            )
++
++    def test_source_row_ids_preserved_after_subsampling(self, tmp_path):
++        """Prediction records and manifest must retain exact original dataset row IDs."""
++        from tools.evaluate import run_evaluation
++
++        out = str(tmp_path / "eval")
++        res = run_evaluation(
++            dataset_path="data/hagrid_airpad.npz",
++            sample_limit=600,
++            output_dir=out,
++        )
++        # Read predictions
++        pred_lines = [json.loads(line) for line in open(os.path.join(out, "predictions.jsonl"))]
++        assert len(pred_lines) == 600
++
++        # Source row IDs must not simply be 0..599 (they span the 60000-sample dataset)
++        source_ids = [p["source_row_id"] for p in pred_lines]
++        assert max(source_ids) > 10000, "Source row IDs must reflect original positions across classes"
++        assert len(set(source_ids)) == 600, "All source row IDs must be unique"
++
++        # Check split manifest has matching test_source_row_ids
++        manifest = json.load(open(os.path.join(out, "split_manifest.json")))
++        all_manifest_test_ids = []
++        for fold in manifest["folds"]:
++            all_manifest_test_ids.extend(fold["test_source_row_ids"])
++        assert sorted(all_manifest_test_ids) == sorted(source_ids)
++
++    def test_multiplicity_audit_exact_duplicates(self, tmp_path):
++        """Provenance audit must identify exact duplicates and use tmp_path for test outputs."""
++        manifest_tmp = str(tmp_path / "manifest.json")
++        report_tmp = str(tmp_path / "report.json")
++        report = audit_datasets(
++            combined_path="data/combined_airpad.npz",
++            hagrid_path="data/hagrid_airpad.npz",
++            custom_path="data/custom_airpad.npz",
++            manifest_out=manifest_tmp,
++            report_out=report_tmp,
++        )
++        assert report["multiplicity_audit"]["duplicate_feature_label_keys"] == 43
++        assert report["multiplicity_audit"]["max_multiplicity"] == 2
++        assert report["multiplicity_audit"]["disambiguated_by_timestamp"] == 43
++        assert report["multiplicity_audit"]["all_duplicates_agree_on_real_user_and_session"] is True
++        assert os.path.exists(manifest_tmp)
++        assert os.path.exists(report_tmp)
++
++    def test_target_class_with_single_user_fails_user_support_check(self, tmp_path):
++        """Target class with < 2 users must fail user support check before evaluation."""
++        from tools.evaluate import run_evaluation
++
++        with pytest.raises(ValueError, match="lacks independent user support"):
++            run_evaluation(
++                dataset_path="data/custom_airpad.npz",
++                output_dir=str(tmp_path),
++            )
++
++    def test_manifest_validation_rejects_corrupted_records(self, tmp_path):
++        """Corrected manifest validation must reject wrong count, coverage gaps, or label mismatch."""
++        from tools.evaluate import apply_and_validate_corrected_manifest
++
++        # Load small dataset
++        c_feat, c_lbl, c_meta = load_dataset_npz("data/custom_airpad.npz")
++        h = "dummy_hash"
++
++        # 1. Test hash mismatch
++        bad_manifest_path = str(tmp_path / "bad_hash.json")
++        with open(bad_manifest_path, "w") as f:
++            json.dump({"metadata": {"combined_hash": "wrong_hash"}, "records": []}, f)
++        with pytest.raises(ValueError, match="hash mismatch"):
++            apply_and_validate_corrected_manifest(c_meta, c_lbl, bad_manifest_path, dataset_hash=h)
++
++        # 2. Test record count mismatch
++        bad_count_path = str(tmp_path / "bad_count.json")
++        with open(bad_count_path, "w") as f:
++            json.dump({"metadata": {"combined_hash": h}, "records": [{"sample_id": 0}]}, f)
++        with pytest.raises(ValueError, match="record count mismatch"):
++            apply_and_validate_corrected_manifest(c_meta, c_lbl, bad_count_path, dataset_hash=h)

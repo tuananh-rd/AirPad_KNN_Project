@@ -1,0 +1,60 @@
+feature:
+  version: 1
+  scale_epsilon: 1.0e-6
+  mirror_to_right: true
+  normalize_rotation: true
+  z_weight: 0.3  # z axis less reliable
+
+ml:
+  algorithm: rbf_svm
+  C: 10.0
+  gamma: scale
+  class_weight: balanced
+  decision_threshold: 0.0  # reject when the winning SVM score is below this
+  margin_threshold: 0.15   # reject when top-1 and top-2 scores are too close
+
+gesture:
+  stability_window: 5
+  majority_ratio: 0.6
+  debounce_ms: 50
+  click_min_ms: 80
+  click_max_ms: 300
+  drag_threshold_ms: 400
+  dwell_zoom_ms: 250
+  hysteresis_exit_count: 3
+  point_one_stable_ms: 100
+  enable_right_click: true
+  enable_swipe: true
+  reacquire_stable_frames: 2
+
+motion:
+  roi_x_min: 0.1
+  roi_x_max: 0.9
+  roi_y_min: 0.1
+  roi_y_max: 0.9
+  mirror_x: true
+  dead_zone: 0.002
+  gain_x: 1.0
+  gain_y: 1.0
+  filter_type: "one_euro"
+  ema_alpha: 0.5
+  one_euro_min_cutoff: 1.0
+  one_euro_beta: 0.007
+  one_euro_d_cutoff: 1.0
+  scroll_dead_zone: 0.005
+  scroll_gain: 120.0
+  scroll_axis_lock_ratio: 1.2
+  zoom_step_threshold: 0.035
+  zoom_cooldown_ms: 80.0
+  swipe_min_displacement: 0.08
+  swipe_min_velocity: 0.0003
+  swipe_cooldown_ms: 400.0
+
+platform:
+  dry_run: true
+  rate_limit_hz: 60
+
+safety:
+  failsafe_corner: true
+  max_events_per_second: 120
+  emergency_hotkey: "ctrl+alt+q"

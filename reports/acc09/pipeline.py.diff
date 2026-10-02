@@ -1,0 +1,344 @@
+--- a/src/runtime/pipeline.py
++++ b/src/runtime/pipeline.py
+@@ -17,7 +17,7 @@
+ from src.motion.swipe import SwipeEngine
+ 
+ from src.features.canonicalize import canonicalize
+-from src.safety.failsafe import RateLimiter, FailsafeMonitor, EmergencyHotkey
++from src.safety.failsafe import RateLimiter, FailsafeMonitor, EmergencyHotkey, SafetyGate
+ 
+ 
+ @dataclass
+@@ -47,6 +47,7 @@
+         rate_limiter: Optional[RateLimiter] = None,
+         failsafe_monitor: Optional[FailsafeMonitor] = None,
+         emergency_hotkey: Optional[EmergencyHotkey] = None,
++        gate: Optional[SafetyGate] = None,
+     ):
+         self.config = config
+         self.controller = controller or DryRunController()
+@@ -62,31 +63,131 @@
+         self.rate_limiter = rate_limiter
+         self.failsafe_monitor = failsafe_monitor
+         self.emergency_hotkey = emergency_hotkey
++        # Validate Gate consistency across controller, FSM, and explicit gate
++        ctrl_gate = getattr(self.controller, 'gate', None)
++        fsm_gate = getattr(self.fsm, 'gate', None) if self.fsm else None
++
++        if gate is not None:
++            if ctrl_gate is not None and ctrl_gate is not gate:
++                raise ValueError("SafetyGate mismatch between explicit gate and controller.gate")
++            if fsm_gate is not None and fsm_gate is not gate:
++                raise ValueError("SafetyGate mismatch between explicit gate and fsm.gate")
++            effective_gate = gate
++        elif ctrl_gate is not None:
++            if fsm_gate is not None and fsm_gate is not ctrl_gate:
++                raise ValueError("SafetyGate mismatch between controller.gate and fsm.gate")
++            effective_gate = ctrl_gate
++        elif fsm_gate is not None:
++            effective_gate = fsm_gate
++        else:
++            effective_gate = SafetyGate()
++
++        self.gate: SafetyGate = effective_gate
++        self.controller.gate = effective_gate
++        if self.fsm is not None:
++            self.fsm.gate = effective_gate
+         self._emergency_stopped = False
+ 
+-        if self.emergency_hotkey is not None:
++        # Fail-closed admission contract for real OS control
++        is_real = (
++            getattr(self.controller, 'allow_real_control', False)
++            or (self.controller.__class__.__name__ == 'WindowsController')
++            or bool(self.config.get("safety", {}).get("allow_real_control", False))
++        )
++        if is_real:
++            if self.emergency_hotkey is None:
++                try:
++                    self.controller.cleanup()
++                except Exception:
++                    pass
++                raise RuntimeError("Real OS control admission refused: emergency hotkey is required")
++            if self.emergency_hotkey.dry_run:
++                try:
++                    self.controller.cleanup()
++                except Exception:
++                    pass
++                raise RuntimeError("Real OS control admission refused: emergency hotkey cannot be dry_run for real control")
+             self.emergency_hotkey.callback = self.trigger_emergency_stop
+-            self.emergency_hotkey.register()
+-
+-        if self.model_bundle is not None:
+-            if self.model_bundle.feature_version != 1:
+-                raise ValueError(f"Model feature version mismatch: expected 1, got {self.model_bundle.feature_version}")
++            try:
++                self.emergency_hotkey.register()
++            except Exception as e:
++                try:
++                    self.emergency_hotkey.unregister()
++                except Exception:
++                    pass
++                try:
++                    self.controller.cleanup()
++                except Exception:
++                    pass
++                raise RuntimeError(f"Real OS control admission refused: emergency hotkey registration failed ({e})") from e
++            if not self.emergency_hotkey.is_registered:
++                try:
++                    self.emergency_hotkey.unregister()
++                except Exception:
++                    pass
++                try:
++                    self.controller.cleanup()
++                except Exception:
++                    pass
++                raise RuntimeError("Real OS control admission refused: emergency hotkey not registered")
++        else:
++            if self.emergency_hotkey is not None:
++                self.emergency_hotkey.callback = self.trigger_emergency_stop
++                self.emergency_hotkey.register()
++
++        # Constructor model bundle validation with rollback
++        try:
++            if self.model_bundle is not None:
++                if self.model_bundle.feature_version != 1:
++                    raise ValueError(f"Model feature version mismatch: expected 1, got {self.model_bundle.feature_version}")
++        except Exception:
++            try:
++                self.cleanup()
++            except Exception:
++                pass
++            raise
+ 
+     @property
+     def is_emergency_stopped(self) -> bool:
+         if self._emergency_stopped:
+             return True
++        if self.gate and self.gate.is_stopped:
++            return True
+         if self.failsafe_monitor and self.failsafe_monitor.is_stopped():
+             return True
++        if self.fsm and getattr(self.fsm, '_emergency_stopped', False):
++            return True
+         return False
+ 
+     def trigger_emergency_stop(self) -> None:
+         self._emergency_stopped = True
+-        if self.failsafe_monitor:
+-            self.failsafe_monitor.emergency_stop()
+-        if self.fsm:
+-            self.fsm.on_emergency_stop()
+-        self.controller.cleanup()
++
++        def _do_stop():
++            cleanup_exc: Optional[Exception] = None
++            if self.failsafe_monitor:
++                try:
++                    self.failsafe_monitor.emergency_stop()
++                except Exception as e:
++                    if cleanup_exc is None:
++                        cleanup_exc = e
++            if self.fsm:
++                try:
++                    self.fsm.on_emergency_stop()
++                except Exception as e:
++                    if cleanup_exc is None:
++                        cleanup_exc = e
++            try:
++                self.controller.cleanup()
++            except Exception as e:
++                if cleanup_exc is None:
++                    cleanup_exc = e
++            if cleanup_exc is not None:
++                raise cleanup_exc
++
++        if self.gate is not None:
++            self.gate.trigger_stop(_do_stop)
++        else:
++            _do_stop()
+ 
+     def process_landmarks(self, landmarks: Optional[np.ndarray], handedness: str = "Right", timestamp_ms: float = 0.0) -> PipelineResult:
+         if self.is_emergency_stopped:
+@@ -169,64 +270,98 @@
+         action_fired = None
+         cursor_pos = None
+ 
+-        # 5. Motion handling
+-        if self.fsm and self.fsm.can_move_cursor(filtered_pose) and self.cursor_mapper:
+-            self._prev_scroll_pos = None
+-            # Use index tip (8)
+-            index_tip = landmarks[8]
+-            x, y = index_tip[0], index_tip[1]
+-            mapped_pos = self.cursor_mapper.map_point(x, y, timestamp=timestamp_ms / 1000.0)
+-            if mapped_pos:
+-                if self.failsafe_monitor and self.failsafe_monitor.check_position(mapped_pos[0], mapped_pos[1]):
+-                    self.trigger_emergency_stop()
+-                    return PipelineResult(
+-                        raw_pose=raw_pose,
+-                        filtered_pose=filtered_pose,
+-                        fsm_state=FSMState.PAUSED,
+-                        cursor_pos=None,
+-                        action_fired="EMERGENCY_STOP",
+-                        telemetry={"status": "emergency_stopped_corner"}
+-                    )
+-                if not self.rate_limiter or self.rate_limiter.allow():
+-                    self.controller.mouse_move(mapped_pos[0], mapped_pos[1])
+-                    cursor_pos = mapped_pos
+-                    action_fired = "MOVE"
+-
+-        elif self.fsm and self.fsm.is_scrolling_active(filtered_pose) and self.scroll_engine:
+-            index_tip = landmarks[8]
+-            middle_tip = landmarks[12]
+-            cx = float(index_tip[0] + middle_tip[0]) / 2.0
+-            cy = float(index_tip[1] + middle_tip[1]) / 2.0
+-            if getattr(self, '_prev_scroll_pos', None) is not None:
+-                dx = cx - self._prev_scroll_pos[0]
+-                dy = cy - self._prev_scroll_pos[1]
+-                steps = self.scroll_engine.update(dx, dy, timestamp_ms)
+-                if steps != (0, 0):
++        # 5. Motion and gesture action dispatch under shared SafetyGate transaction
++        action_fired = None
++        cursor_pos = None
++
++        def _execute_motion():
++            nonlocal action_fired, cursor_pos
++            if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                return
++
++            if self.fsm and self.fsm.can_move_cursor(filtered_pose) and self.cursor_mapper:
++                self._prev_scroll_pos = None
++                # Use index tip (8)
++                index_tip = landmarks[8]
++                x, y = index_tip[0], index_tip[1]
++                mapped_pos = self.cursor_mapper.map_point(x, y, timestamp=timestamp_ms / 1000.0)
++                if mapped_pos:
++                    if self.failsafe_monitor and self.failsafe_monitor.check_position(mapped_pos[0], mapped_pos[1]):
++                        self.trigger_emergency_stop()
++                        return
+                     if not self.rate_limiter or self.rate_limiter.allow():
+-                        self.controller.scroll(steps[0], steps[1])
+-                        action_fired = "SCROLL"
+-            self._prev_scroll_pos = (cx, cy)
+-
+-        elif self.fsm and self.fsm.is_zoom_active(filtered_pose) and self.zoom_engine:
+-            aperture = self.zoom_engine.compute_aperture(landmarks)
+-            steps = self.zoom_engine.update(aperture, timestamp_ms)
+-            if steps != 0:
+-                if not self.rate_limiter or self.rate_limiter.allow():
+-                    if hasattr(self.controller, 'zoom'):
+-                        self.controller.zoom(steps)
+-                    else:
+-                        self.controller.scroll(0, steps)
+-                    action_fired = "ZOOM"
+-
+-        elif self.fsm and self.fsm.state == FSMState.MOVING and filtered_pose == HandPose.THREE_FINGERS and self.swipe_engine:
+-            # Wrist or palm x (using 0 for wrist)
+-            wrist_x = landmarks[0][0]
+-            event = self.swipe_engine.update(wrist_x, timestamp_ms)
+-            if event in ("BACK", "FORWARD"):
+-                if not self.rate_limiter or self.rate_limiter.allow():
+-                    if hasattr(self.controller, 'swipe'):
+-                        self.controller.swipe(event)
+-                    action_fired = f"SWIPE_{event}"
++                        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                            return
++                        self.controller.mouse_move(mapped_pos[0], mapped_pos[1])
++                        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                            return
++                        cursor_pos = mapped_pos
++                        action_fired = "MOVE"
++
++            elif self.fsm and self.fsm.is_scrolling_active(filtered_pose) and self.scroll_engine:
++                index_tip = landmarks[8]
++                middle_tip = landmarks[12]
++                cx = float(index_tip[0] + middle_tip[0]) / 2.0
++                cy = float(index_tip[1] + middle_tip[1]) / 2.0
++                if getattr(self, '_prev_scroll_pos', None) is not None:
++                    dx = cx - self._prev_scroll_pos[0]
++                    dy = cy - self._prev_scroll_pos[1]
++                    steps = self.scroll_engine.update(dx, dy, timestamp_ms)
++                    if steps != (0, 0):
++                        if not self.rate_limiter or self.rate_limiter.allow():
++                            if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                                return
++                            self.controller.scroll(steps[0], steps[1])
++                            if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                                return
++                            action_fired = "SCROLL"
++                self._prev_scroll_pos = (cx, cy)
++
++            elif self.fsm and self.fsm.is_zoom_active(filtered_pose) and self.zoom_engine:
++                aperture = self.zoom_engine.compute_aperture(landmarks)
++                steps = self.zoom_engine.update(aperture, timestamp_ms)
++                if steps != 0:
++                    if not self.rate_limiter or self.rate_limiter.allow():
++                        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                            return
++                        if hasattr(self.controller, 'zoom'):
++                            self.controller.zoom(steps)
++                        else:
++                            self.controller.scroll(0, steps)
++                        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                            return
++                        action_fired = "ZOOM"
++
++            elif self.fsm and self.fsm.state == FSMState.MOVING and filtered_pose == HandPose.THREE_FINGERS and self.swipe_engine:
++                # Wrist or palm x (using 0 for wrist)
++                wrist_x = landmarks[0][0]
++                event = self.swipe_engine.update(wrist_x, timestamp_ms)
++                if event in ("BACK", "FORWARD"):
++                    if not self.rate_limiter or self.rate_limiter.allow():
++                        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                            return
++                        if hasattr(self.controller, 'swipe'):
++                            self.controller.swipe(event)
++                        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++                            return
++                        action_fired = f"SWIPE_{event}"
++
++        if self.gate is not None and hasattr(self.gate, "transaction"):
++            with self.gate.transaction() as active:
++                if active and not self.is_emergency_stopped and not (self.fsm and self.fsm.is_stopped):
++                    _execute_motion()
++        else:
++            _execute_motion()
++
++        if self.is_emergency_stopped or (self.fsm and self.fsm.is_stopped):
++            return PipelineResult(
++                raw_pose=raw_pose,
++                filtered_pose=filtered_pose,
++                fsm_state=FSMState.PAUSED,
++                cursor_pos=None,
++                action_fired="EMERGENCY_STOP",
++                telemetry={"status": "emergency_stopped"}
++            )
+         
+         telemetry = {
+             "timestamp_ms": timestamp_ms,
+@@ -246,8 +381,22 @@
+         )
+ 
+     def cleanup(self) -> None:
++        cleanup_exc: Optional[Exception] = None
+         if self.emergency_hotkey:
+-            self.emergency_hotkey.unregister()
++            try:
++                self.emergency_hotkey.unregister()
++            except Exception as e:
++                cleanup_exc = e
+         if self.fsm:
+-            self.fsm.on_hand_loss()
+-        self.controller.cleanup()
++            try:
++                self.fsm.on_hand_loss()
++            except Exception as e:
++                if cleanup_exc is None:
++                    cleanup_exc = e
++        try:
++            self.controller.cleanup()
++        except Exception as e:
++            if cleanup_exc is None:
++                cleanup_exc = e
++        if cleanup_exc is not None:
++            raise cleanup_exc

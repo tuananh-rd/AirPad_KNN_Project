@@ -1,0 +1,73 @@
+{
+  "status": "PASS",
+  "verified_hashes": {
+    "custom": "498699e1f28a78031193476fbafff2a2cd307bb9d82a8baee6a57f3097019169",
+    "hagrid": "ec38045d608aa6d30386796e4e0586ff619468d4abfd755619835bb8fa61c081",
+    "combined": "c0c6d4e26c26f8a303077c6de971a54c2d4085444f9479cef9e021986cc9e8bf"
+  },
+  "counts": {
+    "hagrid_samples": 60000,
+    "custom_samples": 1066,
+    "combined_samples": 61066
+  },
+  "multiplicity_audit": {
+    "duplicate_feature_label_keys": 43,
+    "max_multiplicity": 2,
+    "disambiguated_by_timestamp": 43,
+    "all_duplicates_agree_on_real_user_and_session": true,
+    "safe_group_match": true
+  },
+  "custom_analysis": {
+    "real_users": [
+      "tuana"
+    ],
+    "real_sessions": [
+      "sess_20260929_132034_7a13ed"
+    ],
+    "synthetic_chunk_users": [
+      "tuana_chunk0",
+      "tuana_chunk1",
+      "tuana_chunk2",
+      "tuana_chunk3",
+      "tuana_chunk4"
+    ],
+    "synthetic_chunk_sessions": [
+      "tuana_L_SHAPE_c0",
+      "tuana_L_SHAPE_c1",
+      "tuana_L_SHAPE_c2",
+      "tuana_L_SHAPE_c3",
+      "tuana_L_SHAPE_c4",
+      "tuana_PINCH_CLOSED_c0",
+      "tuana_PINCH_CLOSED_c1",
+      "tuana_PINCH_CLOSED_c2",
+      "tuana_PINCH_CLOSED_c3",
+      "tuana_PINCH_CLOSED_c4",
+      "tuana_PINCH_MIDDLE_c0",
+      "tuana_PINCH_MIDDLE_c1",
+      "tuana_PINCH_MIDDLE_c2",
+      "tuana_PINCH_MIDDLE_c3",
+      "tuana_PINCH_MIDDLE_c4"
+    ],
+    "leaky_samples_count": 1066,
+    "custom_classes": [
+      "L_SHAPE",
+      "PINCH_CLOSED",
+      "PINCH_MIDDLE"
+    ],
+    "unseen_user_eval_available": false,
+    "reason": "Only 1 real user ('tuana') and 1 real session ('sess_20260929_132034_7a13ed') exist for the 3 custom classes (PINCH_CLOSED, PINCH_MIDDLE, L_SHAPE). Partitioning into synthetic chunks (tuana_chunk0..4) caused 100% fold leakage in historical 5-fold CV. Under strict true-user grouped cross-validation, 1 user cannot be partitioned across 5 folds; unseen-user metrics for these 3 classes are strictly UNAVAILABLE."
+  },
+  "hagrid_analysis": {
+    "n_users": 9170,
+    "n_sessions": 29893,
+    "classes": [
+      "FIST",
+      "OPEN_PALM",
+      "OTHER",
+      "POINT_ONE",
+      "THREE_FINGERS",
+      "TWO_FINGERS_PARALLEL"
+    ],
+    "unseen_user_eval_available": true
+  }
+}

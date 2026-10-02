@@ -1,0 +1,117 @@
+{
+  "status": "NOT_READY",
+  "mode": "personal",
+  "target_classes": [
+    "PINCH_CLOSED",
+    "PINCH_MIDDLE",
+    "L_SHAPE",
+    "OTHER",
+    "POINT_ONE",
+    "OPEN_PALM",
+    "FIST",
+    "TWO_FINGERS_PARALLEL",
+    "THREE_FINGERS"
+  ],
+  "roster": [
+    "tuana"
+  ],
+  "total_samples": 1066,
+  "stable_samples": 1066,
+  "transition_samples": 0,
+  "source_files": {
+    "data/custom_airpad.npz": "498699e1f28a78031193476fbafff2a2cd307bb9d82a8baee6a57f3097019169"
+  },
+  "sessions_summary": {
+    "tuana::sess_20260929_132034_7a13ed": {
+      "session_key": "tuana::sess_20260929_132034_7a13ed",
+      "session_id": "sess_20260929_132034_7a13ed",
+      "user_id": "tuana",
+      "total_samples": 1066,
+      "stable_samples": 1066,
+      "transition_samples": 0,
+      "classes": {
+        "PINCH_CLOSED": 554,
+        "PINCH_MIDDLE": 261,
+        "L_SHAPE": 251
+      },
+      "stable_classes": {
+        "PINCH_CLOSED": 554,
+        "PINCH_MIDDLE": 261,
+        "L_SHAPE": 251
+      }
+    }
+  },
+  "role_assignments": {
+    "train": {
+      "sessions": [
+        "tuana::sess_20260929_132034_7a13ed"
+      ],
+      "participants": [
+        "tuana"
+      ],
+      "total_samples": 1066,
+      "stable_samples": 1066,
+      "transition_samples": 0,
+      "stable_class_counts": {
+        "PINCH_CLOSED": 554,
+        "PINCH_MIDDLE": 261,
+        "L_SHAPE": 251,
+        "OTHER": 0,
+        "POINT_ONE": 0,
+        "OPEN_PALM": 0,
+        "FIST": 0,
+        "TWO_FINGERS_PARALLEL": 0,
+        "THREE_FINGERS": 0
+      }
+    },
+    "validation": {
+      "sessions": [],
+      "participants": [],
+      "total_samples": 0,
+      "stable_samples": 0,
+      "transition_samples": 0,
+      "stable_class_counts": {
+        "PINCH_CLOSED": 0,
+        "PINCH_MIDDLE": 0,
+        "L_SHAPE": 0,
+        "OTHER": 0,
+        "POINT_ONE": 0,
+        "OPEN_PALM": 0,
+        "FIST": 0,
+        "TWO_FINGERS_PARALLEL": 0,
+        "THREE_FINGERS": 0
+      }
+    },
+    "test": {
+      "sessions": [],
+      "participants": [],
+      "total_samples": 0,
+      "stable_samples": 0,
+      "transition_samples": 0,
+      "stable_class_counts": {
+        "PINCH_CLOSED": 0,
+        "PINCH_MIDDLE": 0,
+        "L_SHAPE": 0,
+        "OTHER": 0,
+        "POINT_ONE": 0,
+        "OPEN_PALM": 0,
+        "FIST": 0,
+        "TWO_FINGERS_PARALLEL": 0,
+        "THREE_FINGERS": 0
+      }
+    }
+  },
+  "session_plan": {
+    "tuana::sess_20260929_132034_7a13ed": "train"
+  },
+  "missing_criteria": [
+    "Participant 'tuana' has only 1 session(s) (['sess_20260929_132034_7a13ed']); minimum 3 independent sessions required (at least 1 each for train, validation, test).",
+    "Dataset contains only 3 of 9 target classes: missing ['FIST', 'OPEN_PALM', 'OTHER', 'POINT_ONE', 'THREE_FINGERS', 'TWO_FINGERS_PARALLEL']",
+    "Role 'train' missing stable samples for classes: ['OTHER', 'POINT_ONE', 'OPEN_PALM', 'FIST', 'TWO_FINGERS_PARALLEL', 'THREE_FINGERS']",
+    "Role 'validation' missing sessions from participant 'tuana'",
+    "Role 'validation' missing stable samples for classes: ['PINCH_CLOSED', 'PINCH_MIDDLE', 'L_SHAPE', 'OTHER', 'POINT_ONE', 'OPEN_PALM', 'FIST', 'TWO_FINGERS_PARALLEL', 'THREE_FINGERS']",
+    "Role 'test' missing sessions from participant 'tuana'",
+    "Role 'test' missing stable samples for classes: ['PINCH_CLOSED', 'PINCH_MIDDLE', 'L_SHAPE', 'OTHER', 'POINT_ONE', 'OPEN_PALM', 'FIST', 'TWO_FINGERS_PARALLEL', 'THREE_FINGERS']"
+  ],
+  "timestamp": "2026-09-30T16:58:41.995387+00:00"
+}

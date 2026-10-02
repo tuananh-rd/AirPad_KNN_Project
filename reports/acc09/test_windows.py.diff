@@ -1,0 +1,24 @@
+--- a/tests/test_windows.py
++++ b/tests/test_windows.py
+@@ -78,11 +78,18 @@
+     controller.mouse_down('right')
+     controller.key_down('shift')
+     
+-    # Make one of them raise an exception
+-    mock_gui.mouseUp.side_effect = [Exception("error"), None]
++    # Make first mouseUp raise an exception; subsequent mouseUp calls succeed
++    mock_gui.mouseUp.side_effect = [Exception("error"), None, None]
+     
++    with pytest.raises(Exception, match="error"):
++        controller.cleanup()
++    
++    # The failed button is retained for retry; the other button and key succeeded
++    assert len(controller._held_buttons) == 1
++    assert len(controller._held_keys) == 0
++    
++    # Second cleanup retries and clears the remaining button
+     controller.cleanup()
+-    
+     assert len(controller._held_buttons) == 0
+     assert len(controller._held_keys) == 0
+     

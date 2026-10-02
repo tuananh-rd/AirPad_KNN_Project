@@ -1,0 +1,582 @@
+--- a/tests/test_app.py
++++ b/tests/test_app.py
+@@ -9,12 +9,13 @@
+ """
+
+ from __future__ import annotations
+
+ 
+
++import copy
+
+ import os
+
+ from pathlib import Path
+
+ import pytest
+
+ from unittest.mock import patch, MagicMock
+
+ 
+
+-from app import main, run_self_check, run_replay, run_camera, WARNING_BANNER
+
++from app import main, run_self_check, run_replay, run_camera, create_pipeline, WARNING_BANNER
+
+ 
+
+ 
+
+ def test_self_check_succeeds():
+
+@@ -611,3 +612,275 @@
+     assert len(ctrl.held_keys) == 0
+
+ 
+
+ 
+
++def test_camera_cursor_direction_regression_reproduced_on_saved_initial_app():
+
++    """Reproduce reversed cursor direction regression on saved original app vs fixed app.
+
++
+
++    Problem:
+
++    - OpenCV preview flips webcam horizontally (cv2.flip(frame, 1)). Hand moving to user's
+
++      right appears on the right side of the flipped frame (x increases from 0.35 to 0.65).
+
++    - In initial app.py, run_camera passes config with default mirror_x=True, causing CursorMapper
+
++      to invert x AGAIN (cur_x = 1.0 - x). Thus, moving hand right moved cursor left (reversed!).
+
++    - In fixed app.py, run_camera creates cam_config with mirror_x=False so that increasing
+
++      flipped-preview x directly increases screen x (moving cursor right).
+
++    """
+
++    import importlib.util
+
++    from importlib.machinery import SourceFileLoader
+
++
+
++    initial_path = os.path.join(
+
++        os.path.dirname(os.path.dirname(__file__)), "reports", "acc08", "app.py.initial"
+
++    )
+
++    assert os.path.isfile(initial_path)
+
++    loader = SourceFileLoader("app_initial_acc08", initial_path)
+
++    spec = importlib.util.spec_from_loader("app_initial_acc08", loader)
+
++    app_initial = importlib.util.module_from_spec(spec)
+
++    loader.exec_module(app_initial)
+
++
+
++    created_initial_pipelines = []
+
++    real_create_pipeline_initial = app_initial.create_pipeline
+
++    def spy_create_pipeline_initial(config, allow_real_control=False, model_bundle=None):
+
++        pipe = real_create_pipeline_initial(config, allow_real_control=allow_real_control, model_bundle=model_bundle)
+
++        created_initial_pipelines.append(pipe)
+
++        return pipe
+
++
+
++    fake_cap_initial = FakeVideoCapture([np.zeros((40, 40, 3), dtype=np.uint8)])
+
++    fake_det_initial = FakeDetector()
+
++
+
++    with patch("cv2.VideoCapture", return_value=fake_cap_initial), \
+
++         patch("src.vision.adapter.MediaPipeAdapter", return_value=fake_det_initial), \
+
++         patch.object(app_initial, "create_pipeline", side_effect=spy_create_pipeline_initial), \
+
++         patch("cv2.imshow"), \
+
++         patch("cv2.waitKey", return_value=ord('q')):
+
++
+
++        exit_code_initial = app_initial.run_camera(allow_real_control=False)
+
++        assert exit_code_initial == 0
+
++
+
++    assert len(created_initial_pipelines) == 1
+
++    pipe_initial = created_initial_pipelines[0]
+
++    # On initial app, mirror_x was True
+
++    assert pipe_initial.cursor_mapper.mirror_x is True
+
++    # Demonstrating the reversal on initial app:
+
++    # Hand moving right on flipped preview (x: 0.35 -> 0.65) resulted in DECREASING screen x (cursor moving left!)
+
++    pos_left_hand = pipe_initial.cursor_mapper.map_point(0.35, 0.5, timestamp=1.0)
+
++    pos_right_hand = pipe_initial.cursor_mapper.map_point(0.65, 0.5, timestamp=1.05)
+
++    assert pos_left_hand[0] > pos_right_hand[0], (
+
++        f"Initial app exhibited reversed cursor: screen x decreased ({pos_left_hand[0]} -> {pos_right_hand[0]}) "
+
++        f"when hand moved right on flipped preview"
+
++    )
+
++
+
++    # Now verify fixed app
+
++    created_fixed_pipelines = []
+
++    real_create_pipeline_fixed = create_pipeline
+
++    def spy_create_pipeline_fixed(config, allow_real_control=False, model_bundle=None):
+
++        pipe = real_create_pipeline_fixed(config, allow_real_control=allow_real_control, model_bundle=model_bundle)
+
++        created_fixed_pipelines.append(pipe)
+
++        return pipe
+
++
+
++    fake_cap_fixed = FakeVideoCapture([np.zeros((40, 40, 3), dtype=np.uint8)])
+
++    fake_det_fixed = FakeDetector()
+
++
+
++    with patch("cv2.VideoCapture", return_value=fake_cap_fixed), \
+
++         patch("src.vision.adapter.MediaPipeAdapter", return_value=fake_det_fixed), \
+
++         patch("app.create_pipeline", side_effect=spy_create_pipeline_fixed), \
+
++         patch("cv2.imshow"), \
+
++         patch("cv2.waitKey", return_value=ord('q')):
+
++
+
++        exit_code_fixed = run_camera(allow_real_control=False)
+
++        assert exit_code_fixed == 0
+
++
+
++    assert len(created_fixed_pipelines) == 1
+
++    pipe_fixed = created_fixed_pipelines[0]
+
++    # On fixed app, mirror_x must be False for camera
+
++    assert pipe_fixed.cursor_mapper.mirror_x is False
+
++    # Correct direction:
+
++    # Hand moving right on flipped preview (x: 0.35 -> 0.65) results in INCREASING screen x (cursor moving right!)
+
++    pos_left_hand_fixed = pipe_fixed.cursor_mapper.map_point(0.35, 0.5, timestamp=1.0)
+
++    pos_right_hand_fixed = pipe_fixed.cursor_mapper.map_point(0.65, 0.5, timestamp=1.05)
+
++    assert pos_right_hand_fixed[0] > pos_left_hand_fixed[0], (
+
++        f"Fixed app must move cursor right: screen x increased ({pos_left_hand_fixed[0]} -> {pos_right_hand_fixed[0]}) "
+
++        f"when hand moved right on flipped preview"
+
++    )
+
++
+
++
+
++def test_run_camera_end_to_end_cursor_direction_x_and_y():
+
++    """Verify live run_camera end-to-end with phase-specific RIGHT, LEFT, DOWN, UP controller MOVE deltas.
+
++
+
++    Exercises:
+
++    - Real CursorMapper (with camera-specific mirror_x=False)
+
++    - Real MajorityFilter, StabilityGate, and GestureFSM in MOVING state
+
++    - Real DryRunController recording platform events
+
++    - Phase-specific directional validation:
+
++        1. RIGHT phase: each consecutive MOVE event has dx > 0
+
++        2. LEFT phase: each consecutive MOVE event has dx < 0
+
++        3. DOWN phase: each consecutive MOVE event has dy > 0
+
++        4. UP phase: each consecutive MOVE event has dy < 0
+
++    """
+
++    from src.platform.interface import MouseEvent
+
++    from src.vision.adapter import LandmarkPoint, HandLandmarks
+
++
+
++    def make_positioned_hand(x: float, y: float):
+
++        pts = [LandmarkPoint(x=x, y=y, z=0.0) for _ in range(21)]
+
++        return HandLandmarks(points=pts, handedness="Right", confidence=0.95)
+
++
+
++    # 1. Settling phase: 8 frames at (0.50, 0.50) to allow MajorityFilter (5), StabilityGate (2),
+
++    # and FSM dwell (100ms) to transition to MOVING and establish stable baseline
+
++    settle_frames = [(0.50, 0.50)] * 8
+
++
+
++    # 2. RIGHT phase: 5 steps moving right from 0.50 to 0.65
+
++    right_frames = [(0.50 + i * 0.03, 0.50) for i in range(1, 6)]
+
++
+
++    # 3. LEFT phase: 5 steps moving left from 0.65 back to 0.40
+
++    left_frames = [(0.65 - i * 0.05, 0.50) for i in range(1, 6)]
+
++
+
++    # 4. Vertical settle: 4 frames at (0.50, 0.50) to settle horizontal filter momentum
+
++    vert_settle = [(0.50, 0.50)] * 4
+
++
+
++    # 5. DOWN phase: 5 steps moving down from 0.50 to 0.65
+
++    down_frames = [(0.50, 0.50 + i * 0.03) for i in range(1, 6)]
+
++
+
++    # 6. UP phase: 5 steps moving up from 0.65 back to 0.40
+
++    up_frames = [(0.50, 0.65 - i * 0.05) for i in range(1, 6)]
+
++
+
++    all_coords = settle_frames + right_frames + left_frames + vert_settle + down_frames + up_frames
+
++    hands_seq = [[make_positioned_hand(x, y)] for x, y in all_coords]
+
++
+
++    fake_cap = FakeVideoCapture([np.zeros((50, 50, 3), dtype=np.uint8) for _ in range(len(hands_seq))])
+
++    fake_det = FakeDetector(hands_seq)
+
++
+
++    captured_pipelines = []
+
++    real_create_pipeline = create_pipeline
+
++
+
++    class AlwaysPointOneClassifier:
+
++        def predict_with_rejection(self, canon_flat, decision_threshold=0.0, margin_threshold=0.15, unknown_label="UNKNOWN"):
+
++            return ["POINT_ONE"]
+
++
+
++    def spy_create_pipeline(config, allow_real_control=False, model_bundle=None):
+
++        pipe = real_create_pipeline(config, allow_real_control=allow_real_control, model_bundle=model_bundle)
+
++        pipe.classifier = AlwaysPointOneClassifier()
+
++        # Test instrumentation: rate_limiter.allow is mocked to True strictly in this isolated test
+
++        # to allow deterministic per-frame event dispatch without depending on wall-clock sleep timing,
+
++        # preserving all production filtering, FSM gating, and coordinate transformation logic.
+
++        if pipe.rate_limiter:
+
++            pipe.rate_limiter.allow = lambda: True
+
++        captured_pipelines.append(pipe)
+
++        return pipe
+
++
+
++    simulated_time = 1000.0
+
++    def advancing_time():
+
++        nonlocal simulated_time
+
++        simulated_time += 0.0333
+
++        return simulated_time
+
++
+
++    with patch("cv2.VideoCapture", return_value=fake_cap), \
+
++         patch("src.vision.adapter.MediaPipeAdapter", return_value=fake_det), \
+
++         patch("app.create_pipeline", side_effect=spy_create_pipeline), \
+
++         patch("cv2.imshow"), \
+
++         patch("cv2.waitKey", return_value=0), \
+
++         patch("time.time", side_effect=advancing_time):
+
++
+
++        exit_code = run_camera(allow_real_control=False)
+
++        assert exit_code == 0
+
++
+
++    assert len(captured_pipelines) == 1
+
++    pipe = captured_pipelines[0]
+
++    ctrl = pipe.controller
+
++    move_events = [e for e in ctrl.event_log if e.get("type") == MouseEvent.MOVE]
+
++    assert len(move_events) >= 20, f"Expected >= 20 MOVE events, got {len(move_events)}"
+
++
+
++    deltas = [(move_events[i]["x"] - move_events[i-1]["x"], move_events[i]["y"] - move_events[i-1]["y"])
+
++              for i in range(1, len(move_events))]
+
++
+
++    # Phase-specific delta validations based on known sequence indices
+
++    # RIGHT phase deltas (indices 2 to 6 in delta list)
+
++    right_deltas = [d[0] for d in deltas[2:7]]
+
++    assert len(right_deltas) == 5
+
++    assert all(dx > 0 for dx in right_deltas), f"RIGHT phase must have all positive dx, got {right_deltas}"
+
++
+
++    # LEFT phase deltas (indices 8 to 12 in delta list)
+
++    left_deltas = [d[0] for d in deltas[8:12]]
+
++    assert len(left_deltas) == 4
+
++    assert all(dx < 0 for dx in left_deltas), f"LEFT phase must have all negative dx, got {left_deltas}"
+
++
+
++    # DOWN phase deltas (indices 16 to 21 in delta list)
+
++    down_deltas = [d[1] for d in deltas[16:21]]
+
++    assert len(down_deltas) == 5
+
++    assert all(dy > 0 for dy in down_deltas), f"DOWN phase must have all positive dy, got {down_deltas}"
+
++
+
++    # UP phase deltas (indices 22 to 26 in delta list)
+
++    up_deltas = [d[1] for d in deltas[22:26]]
+
++    assert len(up_deltas) == 4
+
++    assert all(dy < 0 for dy in up_deltas), f"UP phase must have all negative dy, got {up_deltas}"
+
++
+
++
+
++def test_run_camera_does_not_mutate_config_and_preserves_generic_pipeline():
+
++    """Verify run_camera does not mutate the loaded config dictionary object in-place,
+
++    and preserves generic pipeline mirror_x=True/False opposite mapping semantics.
+
++    """
+
++    from src.config.loader import load_config
+
++
+
++    # 1. Load config and keep a pristine deep-copied copy of the exact dictionary
+
++    initial_cfg = load_config()
+
++    assert initial_cfg.get("motion", {}).get("mirror_x") is True, "Default config in default.yaml must have mirror_x=True"
+
++    pristine_cfg = copy.deepcopy(initial_cfg)
+
++
+
++    # 2. Patch app.load_config to return the EXACT initial_cfg object (same instance in memory)
+
++    fake_cap = FakeVideoCapture([np.zeros((40, 40, 3), dtype=np.uint8)])
+
++    fake_det = FakeDetector()
+
++
+
++    with patch("app.load_config", return_value=initial_cfg), \
+
++         patch("cv2.VideoCapture", return_value=fake_cap), \
+
++         patch("src.vision.adapter.MediaPipeAdapter", return_value=fake_det), \
+
++         patch("cv2.imshow"), \
+
++         patch("cv2.waitKey", return_value=ord('q')):
+
++
+
++        exit_code = run_camera(allow_real_control=False)
+
++        assert exit_code == 0
+
++
+
++    # Assert that initial_cfg was NOT mutated in-place by run_camera
+
++    assert initial_cfg == pristine_cfg, "run_camera must not mutate the loaded config dictionary in-place"
+
++    assert initial_cfg["motion"]["mirror_x"] is True, "initial_cfg['motion']['mirror_x'] must remain True"
+
++
+
++    # 3. Assert effective camera pipeline has mirror_x=False
+
++    captured_pipelines = []
+
++    real_create_pipeline = create_pipeline
+
++    def spy_create_pipeline(config, allow_real_control=False, model_bundle=None):
+
++        pipe = real_create_pipeline(config, allow_real_control=allow_real_control, model_bundle=model_bundle)
+
++        captured_pipelines.append(pipe)
+
++        return pipe
+
++
+
++    fake_cap2 = FakeVideoCapture([np.zeros((40, 40, 3), dtype=np.uint8)])
+
++    fake_det2 = FakeDetector()
+
++    with patch("cv2.VideoCapture", return_value=fake_cap2), \
+
++         patch("src.vision.adapter.MediaPipeAdapter", return_value=fake_det2), \
+
++         patch("app.create_pipeline", side_effect=spy_create_pipeline), \
+
++         patch("cv2.imshow"), \
+
++         patch("cv2.waitKey", return_value=ord('q')):
+
++
+
++        exit_code2 = run_camera(allow_real_control=False)
+
++        assert exit_code2 == 0
+
++
+
++    assert len(captured_pipelines) == 1
+
++    cam_pipe = captured_pipelines[0]
+
++    assert cam_pipe.cursor_mapper.mirror_x is False, "Camera pipeline must have effective mirror_x=False"
+
++
+
++    # 4. Verify generic create_pipeline with mirror_x=True vs mirror_x=False maps opposite x directions
+
++    pipe_mirrored = create_pipeline(pristine_cfg, allow_real_control=False)
+
++    assert pipe_mirrored.cursor_mapper.mirror_x is True
+
++
+
++    unmirrored_cfg = copy.deepcopy(pristine_cfg)
+
++    unmirrored_cfg["motion"]["mirror_x"] = False
+
++    pipe_unmirrored = create_pipeline(unmirrored_cfg, allow_real_control=False)
+
++    assert pipe_unmirrored.cursor_mapper.mirror_x is False
+
++
+
++    # When landmark moves left-to-right (0.35 -> 0.65):
+
++    # - Mirrored pipeline moves screen x in opposite direction (decreases screen x)
+
++    # - Unmirrored pipeline moves screen x in same direction (increases screen x)
+
++    x_mirrored_start = pipe_mirrored.cursor_mapper.map_point(0.35, 0.5, timestamp=1.0)[0]
+
++    x_mirrored_end = pipe_mirrored.cursor_mapper.map_point(0.65, 0.5, timestamp=1.05)[0]
+
++    assert x_mirrored_end < x_mirrored_start, "Generic mirror_x=True maps increasing preview x to decreasing screen x"
+
++
+
++    x_unmirrored_start = pipe_unmirrored.cursor_mapper.map_point(0.35, 0.5, timestamp=1.0)[0]
+
++    x_unmirrored_end = pipe_unmirrored.cursor_mapper.map_point(0.65, 0.5, timestamp=1.05)[0]
+
++    assert x_unmirrored_end > x_unmirrored_start, "Generic mirror_x=False maps increasing preview x to increasing screen x"
+
++
+
++
+
++
+

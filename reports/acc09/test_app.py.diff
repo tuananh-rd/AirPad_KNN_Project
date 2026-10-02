@@ -1,0 +1,30 @@
+--- a/tests/test_app.py
++++ b/tests/test_app.py
+@@ -11,6 +11,7 @@
+ 
+ import copy
+ import os
++import sys
+ from pathlib import Path
+ import pytest
+ from unittest.mock import patch, MagicMock
+@@ -51,11 +52,18 @@
+     )
+     # Replay with --real-control: should print warning banner
+     # We mock WindowsController to avoid actually moving user's OS mouse
+-    with patch("src.platform.windows.WindowsController") as mock_ctrl_class:
++    # and mock keyboard to prevent registering any real low-level OS hooks
++    mock_keyboard = MagicMock()
++    with patch("src.platform.windows.WindowsController") as mock_ctrl_class, \
++         patch.dict(sys.modules, {"keyboard": mock_keyboard}):
+         mock_instance = mock_ctrl_class.return_value
++        mock_instance.gate = None
+         mock_instance.held_buttons = set()
++        mock_instance.held_keys = set()
+         exit_code = main(["--replay", fixture_path, "--real-control"])
+         assert exit_code == 0
++        assert mock_keyboard.add_hotkey.called, "Hotkey registration must be exercised during admission"
++        assert mock_keyboard.remove_hotkey.called, "Hotkey must be unregistered on cleanup"
+ 
+     captured = capsys.readouterr()
+     assert "WARNING" in captured.out

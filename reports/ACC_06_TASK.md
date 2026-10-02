@@ -1,0 +1,13 @@
+# ACC-06: safe guided shadow-only observation trial
+
+User approved proceeding on 2026-10-01 after ACC-05 review. Exactly one new task assigned to existing Antigravity terminal, direct Orca fallback request51e0454f-1ffd-41a2-ab49-2e49db8a6ea4 (input accepted; provider does not machine-report turn start). No code edited by Coordinator. Await terminal processing/completion and independent review before opening camera.
+
+Evidence: independent285 tests pass, frozen personal candidate beats production baseline on same1663 frames, but pinch recall64.60%/68.94% and OTHER33/191 target misclassifications preclude promotion. Candidate SHA66091d52d9dd6848fd8e35fc2641a31c4c2ffc9008329a4d2e9f85f8dd1246be; baseline SHA4cc3c55f5e4b571c5462de31afd6d5c4db64c803466d306cdefab34b31d7b977. Prior test consumed: no tuning or new architecture.
+
+Allowed new files: tools/shadow_trial.py, tests/test_shadow_trial.py, docs/SHADOW_TRIAL.md, reports/ACC_06_WORKER_REPORT.md, synthetic evidence under reports/acc06. All existing application/source/config/model/data/ACC05 artifacts immutable. Pre-task Coordinator hash snapshot73 relevant files retained for comparison. No Git repo available.
+
+Standalone classification/logging only: reuse adapter/canonicalization/bundle loader; no app pipeline/FSM/controller/OS events/hotkeys or implicit network downloads. Explicit flipped BGR-to-RGB detection. Pin candidate and check paths/resources before camera. Frozen decision0/margin.15. Reject --real-control. No promotion.
+
+Guide: WAITING until one SPACE; predeclared NO_HAND, gestures1–9 in collection order, OTHER, NO_HAND; each preparation >=3 seconds excluded from stable metrics, observation >=5 seconds, automatic advancement/incremental saving, Q/ESC stop. Labels are intended poses, not independently confirmed truth. Log every successful camera frame including missing detection; target detector dropout counts as error/full denominator. Separate intended NO_HAND false detections, OTHER potential-target counts, pinch recalls and detection rates. Role shadow_observation; new unique session. Only landmarks/metadata, no stored camera images/video. Exclusive new JSONL/summary, cleanup and incomplete-state reporting on failures/early quit.
+
+Completion: synthetic fake-camera end-to-end tests for fixed schedule/RGB/no-hand/dropout/UNKNOWN/support/cleanup/input guards, safety test prevents forbidden module/controller usage, all existing tests plus ACC04/05 experiments pass, protected hashes unchanged, launch instructions/report and ACC06_DIRECT_DONE; Worker then idle. Coordinator independently reviews and runs tests, then may open preview under user's authorization. Physical user performance is required for live evidence; no live accuracy claim before recording/audit.

@@ -1,0 +1,247 @@
+{
+  "status": "READY",
+  "mode": "personal",
+  "target_classes": [
+    "PINCH_CLOSED",
+    "PINCH_MIDDLE",
+    "L_SHAPE",
+    "OTHER",
+    "POINT_ONE",
+    "OPEN_PALM",
+    "FIST",
+    "TWO_FINGERS_PARALLEL",
+    "THREE_FINGERS"
+  ],
+  "roster": [
+    "tuana"
+  ],
+  "total_samples": 5101,
+  "stable_samples": 5101,
+  "transition_samples": 0,
+  "source_files": {
+    "data/cohort/tuana_train_rgb_20261001_110223_8ff3ed.npz": "0f9d21b5b1a5ccab0ffc8f555d7c00e14b26fa2299040b9ab587b236e7d1014e",
+    "data/cohort/curated/acc04_validation_clean.npz": "e0a27d1bd989a1ac1fe9fccc90c9ae57a47a8ca0637f1959cab91a4fcc99000d",
+    "data/cohort/tuana_validation_retake_20261001_113202_dfcd6b.npz": "fe26b606921386a0f640dc958e4e7ebf01e43ce0d6cd6f07e693fce517db8948",
+    "data/cohort/tuana_test_rgb_20261001_115837_5741bd.npz": "4ec1cf2dfbdcd74b5c22c914a31c52bf2fd3c11d5c3a4de5a49368eb9cca28fb"
+  },
+  "sessions_summary": {
+    "tuana::tuana_train_rgb_20261001_110223_8ff3ed": {
+      "session_key": "tuana::tuana_train_rgb_20261001_110223_8ff3ed",
+      "session_id": "tuana_train_rgb_20261001_110223_8ff3ed",
+      "user_id": "tuana",
+      "total_samples": 1692,
+      "stable_samples": 1692,
+      "transition_samples": 0,
+      "classes": {
+        "POINT_ONE": 191,
+        "OPEN_PALM": 177,
+        "FIST": 189,
+        "TWO_FINGERS_PARALLEL": 184,
+        "THREE_FINGERS": 182,
+        "PINCH_CLOSED": 173,
+        "PINCH_MIDDLE": 190,
+        "L_SHAPE": 198,
+        "OTHER": 208
+      },
+      "stable_classes": {
+        "POINT_ONE": 191,
+        "OPEN_PALM": 177,
+        "FIST": 189,
+        "TWO_FINGERS_PARALLEL": 184,
+        "THREE_FINGERS": 182,
+        "PINCH_CLOSED": 173,
+        "PINCH_MIDDLE": 190,
+        "L_SHAPE": 198,
+        "OTHER": 208
+      }
+    },
+    "tuana::tuana_validation_rgb_20261001_112128_2a3fea": {
+      "session_key": "tuana::tuana_validation_rgb_20261001_112128_2a3fea",
+      "session_id": "tuana_validation_rgb_20261001_112128_2a3fea",
+      "user_id": "tuana",
+      "total_samples": 1331,
+      "stable_samples": 1331,
+      "transition_samples": 0,
+      "classes": {
+        "PINCH_CLOSED": 173,
+        "PINCH_MIDDLE": 170,
+        "POINT_ONE": 193,
+        "OPEN_PALM": 185,
+        "FIST": 195,
+        "TWO_FINGERS_PARALLEL": 202,
+        "THREE_FINGERS": 213
+      },
+      "stable_classes": {
+        "PINCH_CLOSED": 173,
+        "PINCH_MIDDLE": 170,
+        "POINT_ONE": 193,
+        "OPEN_PALM": 185,
+        "FIST": 195,
+        "TWO_FINGERS_PARALLEL": 202,
+        "THREE_FINGERS": 213
+      }
+    },
+    "tuana::tuana_validation_retake_20261001_113202_dfcd6b": {
+      "session_key": "tuana::tuana_validation_retake_20261001_113202_dfcd6b",
+      "session_id": "tuana_validation_retake_20261001_113202_dfcd6b",
+      "user_id": "tuana",
+      "total_samples": 415,
+      "stable_samples": 415,
+      "transition_samples": 0,
+      "classes": {
+        "L_SHAPE": 209,
+        "OTHER": 206
+      },
+      "stable_classes": {
+        "L_SHAPE": 209,
+        "OTHER": 206
+      }
+    },
+    "tuana::tuana_test_rgb_20261001_115837_5741bd": {
+      "session_key": "tuana::tuana_test_rgb_20261001_115837_5741bd",
+      "session_id": "tuana_test_rgb_20261001_115837_5741bd",
+      "user_id": "tuana",
+      "total_samples": 1663,
+      "stable_samples": 1663,
+      "transition_samples": 0,
+      "classes": {
+        "PINCH_CLOSED": 161,
+        "PINCH_MIDDLE": 161,
+        "L_SHAPE": 184,
+        "OTHER": 191,
+        "POINT_ONE": 199,
+        "OPEN_PALM": 220,
+        "FIST": 180,
+        "TWO_FINGERS_PARALLEL": 181,
+        "THREE_FINGERS": 186
+      },
+      "stable_classes": {
+        "PINCH_CLOSED": 161,
+        "PINCH_MIDDLE": 161,
+        "L_SHAPE": 184,
+        "OTHER": 191,
+        "POINT_ONE": 199,
+        "OPEN_PALM": 220,
+        "FIST": 180,
+        "TWO_FINGERS_PARALLEL": 181,
+        "THREE_FINGERS": 186
+      }
+    }
+  },
+  "role_assignments": {
+    "train": {
+      "sessions": [
+        "tuana::tuana_train_rgb_20261001_110223_8ff3ed"
+      ],
+      "participants": [
+        "tuana"
+      ],
+      "total_samples": 1692,
+      "stable_samples": 1692,
+      "transition_samples": 0,
+      "stable_class_counts": {
+        "PINCH_CLOSED": 173,
+        "PINCH_MIDDLE": 190,
+        "L_SHAPE": 198,
+        "OTHER": 208,
+        "POINT_ONE": 191,
+        "OPEN_PALM": 177,
+        "FIST": 189,
+        "TWO_FINGERS_PARALLEL": 184,
+        "THREE_FINGERS": 182
+      },
+      "participant_stable_class_counts": {
+        "tuana": {
+          "PINCH_CLOSED": 173,
+          "PINCH_MIDDLE": 190,
+          "L_SHAPE": 198,
+          "OTHER": 208,
+          "POINT_ONE": 191,
+          "OPEN_PALM": 177,
+          "FIST": 189,
+          "TWO_FINGERS_PARALLEL": 184,
+          "THREE_FINGERS": 182
+        }
+      }
+    },
+    "validation": {
+      "sessions": [
+        "tuana::tuana_validation_rgb_20261001_112128_2a3fea",
+        "tuana::tuana_validation_retake_20261001_113202_dfcd6b"
+      ],
+      "participants": [
+        "tuana"
+      ],
+      "total_samples": 1746,
+      "stable_samples": 1746,
+      "transition_samples": 0,
+      "stable_class_counts": {
+        "PINCH_CLOSED": 173,
+        "PINCH_MIDDLE": 170,
+        "L_SHAPE": 209,
+        "OTHER": 206,
+        "POINT_ONE": 193,
+        "OPEN_PALM": 185,
+        "FIST": 195,
+        "TWO_FINGERS_PARALLEL": 202,
+        "THREE_FINGERS": 213
+      },
+      "participant_stable_class_counts": {
+        "tuana": {
+          "PINCH_CLOSED": 173,
+          "PINCH_MIDDLE": 170,
+          "L_SHAPE": 209,
+          "OTHER": 206,
+          "POINT_ONE": 193,
+          "OPEN_PALM": 185,
+          "FIST": 195,
+          "TWO_FINGERS_PARALLEL": 202,
+          "THREE_FINGERS": 213
+        }
+      }
+    },
+    "test": {
+      "sessions": [
+        "tuana::tuana_test_rgb_20261001_115837_5741bd"
+      ],
+      "participants": [
+        "tuana"
+      ],
+      "total_samples": 1663,
+      "stable_samples": 1663,
+      "transition_samples": 0,
+      "stable_class_counts": {
+        "PINCH_CLOSED": 161,
+        "PINCH_MIDDLE": 161,
+        "L_SHAPE": 184,
+        "OTHER": 191,
+        "POINT_ONE": 199,
+        "OPEN_PALM": 220,
+        "FIST": 180,
+        "TWO_FINGERS_PARALLEL": 181,
+        "THREE_FINGERS": 186
+      },
+      "participant_stable_class_counts": {
+        "tuana": {
+          "PINCH_CLOSED": 161,
+          "PINCH_MIDDLE": 161,
+          "L_SHAPE": 184,
+          "OTHER": 191,
+          "POINT_ONE": 199,
+          "OPEN_PALM": 220,
+          "FIST": 180,
+          "TWO_FINGERS_PARALLEL": 181,
+          "THREE_FINGERS": 186
+        }
+      }
+    }
+  },
+  "session_plan": {
+    "tuana::tuana_train_rgb_20261001_110223_8ff3ed": "train",
+    "tuana::tuana_validation_rgb_20261001_112128_2a3fea": "validation",
+    "tuana::tuana_validation_retake_20261001_113202_dfcd6b": "validation",
+    "tuana::tuana_test_rgb_20261001_115837_5741bd": "test"
+  },
+  "missing_criteria": [],
+  "timestamp": "2026-10-01T05:16:38.534757+00:00"
+}

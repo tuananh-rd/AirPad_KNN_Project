@@ -1,0 +1,310 @@
+{
+  "evaluation_name": "ACC-01 Clean Six-Class HaGRID Baseline Evaluation",
+  "dataset_path": "data/hagrid_airpad.npz",
+  "dataset_hash": "ec38045d608aa6d30386796e4e0586ff619468d4abfd755619835bb8fa61c081",
+  "evaluator_source_hash": "fa9995adcda6ec425431362c92baa62f2013c062e7704cf44104f42f829ad67c",
+  "manifest_hash": null,
+  "split_fingerprint": "9f8d1131ecaee79bf3bff3a52090adac9ff083fa59bd98fc4ad8bd552c8afe7e",
+  "sample_limit": null,
+  "n_total_source_rows": 60000,
+  "n_evaluated_samples": 60000,
+  "target_classes": [
+    "FIST",
+    "OPEN_PALM",
+    "OTHER",
+    "POINT_ONE",
+    "THREE_FINGERS",
+    "TWO_FINGERS_PARALLEL"
+  ],
+  "group_key": "user_id",
+  "n_splits": 5,
+  "seed": 42,
+  "hyperparameters": {
+    "C": 10.0,
+    "gamma": 0.01,
+    "class_weight": "balanced",
+    "decision_threshold": 0.0,
+    "margin_threshold": 0.15
+  },
+  "custom_classes_unseen_user_status": {
+    "status": "UNAVAILABLE",
+    "reason": "Only 1 real user ('tuana') and 1 real session ('sess_20260929_132034_7a13ed') exist for PINCH_CLOSED, PINCH_MIDDLE, and L_SHAPE. Clean unseen-user generalization metrics are strictly unavailable without additional user data. This benchmark evaluates the 6 HaGRID classes only; 9-class clean performance cannot be claimed.",
+    "affected_classes": [
+      "PINCH_CLOSED",
+      "PINCH_MIDDLE",
+      "L_SHAPE"
+    ]
+  },
+  "clean_baseline_post_rejection": {
+    "macro_f1": 0.9918544754844651,
+    "accuracy": 0.9917333333333334,
+    "balanced_accuracy": 0.9917333333333334,
+    "support": 60000,
+    "coverage": 0.99975,
+    "rejection_rate": 0.00025,
+    "per_class": {
+      "FIST": {
+        "precision": 0.988937612118796,
+        "recall": 0.9923,
+        "f1": 0.9906159528801037,
+        "support": 10000
+      },
+      "OPEN_PALM": {
+        "precision": 0.9936350074589756,
+        "recall": 0.9991,
+        "f1": 0.9963600099725755,
+        "support": 10000
+      },
+      "OTHER": {
+        "precision": 0.9874523188114837,
+        "recall": 0.9837,
+        "f1": 0.9855725879170424,
+        "support": 10000
+      },
+      "POINT_ONE": {
+        "precision": 0.9924827102335372,
+        "recall": 0.9902,
+        "f1": 0.9913400410472043,
+        "support": 10000
+      },
+      "THREE_FINGERS": {
+        "precision": 0.9966867469879518,
+        "recall": 0.9927,
+        "f1": 0.994689378757515,
+        "support": 10000
+      },
+      "TWO_FINGERS_PARALLEL": {
+        "precision": 0.9926978093428028,
+        "recall": 0.9924,
+        "f1": 0.99254888233235,
+        "support": 10000
+      }
+    },
+    "confusion_matrix": [
+      [
+        9923,
+        2,
+        48,
+        23,
+        2,
+        2,
+        0
+      ],
+      [
+        0,
+        9991,
+        7,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        49,
+        43,
+        9837,
+        28,
+        15,
+        21,
+        7
+      ],
+      [
+        50,
+        0,
+        19,
+        9902,
+        0,
+        26,
+        3
+      ],
+      [
+        0,
+        15,
+        29,
+        2,
+        9927,
+        24,
+        3
+      ],
+      [
+        12,
+        4,
+        22,
+        22,
+        14,
+        9924,
+        2
+      ]
+    ],
+    "confusion_row_labels": [
+      "FIST",
+      "OPEN_PALM",
+      "OTHER",
+      "POINT_ONE",
+      "THREE_FINGERS",
+      "TWO_FINGERS_PARALLEL"
+    ],
+    "confusion_col_labels": [
+      "FIST",
+      "OPEN_PALM",
+      "OTHER",
+      "POINT_ONE",
+      "THREE_FINGERS",
+      "TWO_FINGERS_PARALLEL",
+      "UNKNOWN"
+    ]
+  },
+  "raw_baseline_pre_rejection": {
+    "macro_f1": 0.9917306463380989,
+    "accuracy": 0.9917333333333334,
+    "balanced_accuracy": 0.9917333333333334,
+    "support": 60000,
+    "per_class": {
+      "FIST": {
+        "precision": 0.9883466135458168,
+        "recall": 0.9923,
+        "f1": 0.9903193612774451,
+        "support": 10000
+      },
+      "OPEN_PALM": {
+        "precision": 0.9929437487577022,
+        "recall": 0.9991,
+        "f1": 0.9960123616787957,
+        "support": 10000
+      },
+      "OTHER": {
+        "precision": 0.987254114813328,
+        "recall": 0.9837,
+        "f1": 0.9854738529352836,
+        "support": 10000
+      },
+      "POINT_ONE": {
+        "precision": 0.9924827102335372,
+        "recall": 0.9902,
+        "f1": 0.9913400410472043,
+        "support": 10000
+      },
+      "THREE_FINGERS": {
+        "precision": 0.9966867469879518,
+        "recall": 0.9927,
+        "f1": 0.994689378757515,
+        "support": 10000
+      },
+      "TWO_FINGERS_PARALLEL": {
+        "precision": 0.9926978093428028,
+        "recall": 0.9924,
+        "f1": 0.99254888233235,
+        "support": 10000
+      }
+    },
+    "confusion_matrix": [
+      [
+        9923,
+        2,
+        48,
+        23,
+        2,
+        2
+      ],
+      [
+        0,
+        9991,
+        7,
+        0,
+        2,
+        0
+      ],
+      [
+        52,
+        47,
+        9837,
+        28,
+        15,
+        21
+      ],
+      [
+        53,
+        0,
+        19,
+        9902,
+        0,
+        26
+      ],
+      [
+        0,
+        18,
+        29,
+        2,
+        9927,
+        24
+      ],
+      [
+        12,
+        4,
+        24,
+        22,
+        14,
+        9924
+      ]
+    ]
+  },
+  "per_fold_summary": [
+    {
+      "fold": 0,
+      "clean_macro_f1": 0.9938456133824364,
+      "clean_accuracy": 0.9938147776663323,
+      "raw_macro_f1": 0.9937643158758379,
+      "raw_accuracy": 0.9938147776663323,
+      "rejection_rate": 0.00016716817118020728,
+      "user_leakage": 0,
+      "session_leakage": 0
+    },
+    {
+      "fold": 1,
+      "clean_macro_f1": 0.990567431540895,
+      "clean_accuracy": 0.9904118726029681,
+      "raw_macro_f1": 0.9903211332973951,
+      "raw_accuracy": 0.9904118726029681,
+      "rejection_rate": 0.0005002501250625312,
+      "user_leakage": 0,
+      "session_leakage": 0
+    },
+    {
+      "fold": 2,
+      "clean_macro_f1": 0.9910891494892445,
+      "clean_accuracy": 0.9909554349613551,
+      "raw_macro_f1": 0.9909689789082088,
+      "raw_accuracy": 0.9909554349613551,
+      "rejection_rate": 0.000246669955599408,
+      "user_leakage": 0,
+      "session_leakage": 0
+    },
+    {
+      "fold": 3,
+      "clean_macro_f1": 0.9914697897371116,
+      "clean_accuracy": 0.9914607859393135,
+      "raw_macro_f1": 0.9914697897371116,
+      "raw_accuracy": 0.9914607859393135,
+      "rejection_rate": 0.0,
+      "user_leakage": 0,
+      "session_leakage": 0
+    },
+    {
+      "fold": 4,
+      "clean_macro_f1": 0.9922733623920453,
+      "clean_accuracy": 0.9920460314774073,
+      "raw_macro_f1": 0.992104759433159,
+      "raw_accuracy": 0.9920460314774073,
+      "rejection_rate": 0.00033846674564224065,
+      "user_leakage": 0,
+      "session_leakage": 0
+    }
+  ],
+  "historical_comparison_notes": {
+    "historical_macro_f1": 0.967276,
+    "historical_is_leaky": true,
+    "historical_reason": "Evaluated on synthetic chunks (tuana_chunk0..4) with 100% user/session leakage.",
+    "direct_comparison_valid": false,
+    "note": "Clean six-class baseline score must not be directly compared to leaky nine-class historical score."
+  }
+}
