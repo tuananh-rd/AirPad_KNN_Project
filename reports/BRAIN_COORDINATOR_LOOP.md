@@ -1,5 +1,9 @@
 # AirPad Brain / Coordinator loop
 
+### 2026-10-06 07:56 — reopen Hybrid camera blocked by Windows signing policy
+
+User asks reopen; previous explicitREALHybridpermission retained, appstartsOFF. Accepted8keysource/config/candidate hashes unchanged; noexistingcamera; oldOrcahandle stale andmaintermlist empty. Created oneappterminalterm_bb0778bd (notWorker), receipt43336e43, exactexistingREALHybridcommand. Brieflauncher11912/child10952 exits beforepipeline/camera: SciPy `_solve_toeplitz` DLL load blocked by ApplicationControl. Terminalb2722b/25de40 and CodeIntegrityevents3033/3077 identify .venv scipy/linalg/_solve_toeplitz.cp314-win_amd64.pyd signingpolicy0283ac0f. Finalzeroapp processes/windows, cameraNOTopened. No code/model/config/dependency/security change, paidfallback or newWorker/task. Need separately scoped environment/security remediation direction; never auto-disable/bypasspolicy. Report HYB_CAMERA_REOPEN_2026-10-06.md.
+
 ### 2026-10-02 22:00 — explicit real Hybrid trial permission; one camera started
 
 User `ok` approves requested real OS scroll/tab trial. No existingcamera; accepted app/pipeline/motion/platform/failsafe/config/candidate hashes unchanged. Reused inspectedidle app terminalterm_ea40e4e6, exact app.py --camera --profile hybrid --real-control --model reports/acc05/candidate_personal_svm.json. Receiptb03cd97b accepted; freshread18f018/cursor25 confirms REALHybridwarning+camera started. Launcher1720/child12068 respondingAirPadwindow. StartsOFF, userSPACE then physicalmousechooseforegoundtarget; no Brain-injectedOS actions. Retained for user trial; globalCtrlAltQ emergency (cornerunavailable), focusedSPACE OFF/Q/Esc exit. No code/config/model edits/new Worker/task/paidfallback; physicalresults pending. Report HYB_01_REAL_CONTROL_TRIAL_2026-10-02.md.
